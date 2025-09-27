@@ -1,0 +1,385 @@
+import textwrap
+
+def generate_cvclone_page_with_chat_logic():
+    """Generates the HTML, CSS, and JavaScript content for the Cvclone page 
+    with chat visible on Home and Chat tabs only."""
+
+    # Note: The provided API Key "AIzaSyBQQhjLjjYo4CCV3yil5JBCxpoBOz7qExY" is used as requested.
+
+    html_content = textwrap.dedent("""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Cvclone</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                margin: 0;
+                display: flex;
+                height: 100vh;
+                overflow: hidden;
+                background-color: #f4f4f9;
+            }
+
+            /* --- Sidebar/Navigation --- */
+            .sidebar {
+                width: 200px;
+                background-color: #2c3e50;
+                color: white;
+                display: flex;
+                flex-direction: column;
+                padding: 15px 0;
+                box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+            }
+
+            .sidebar-title {
+                text-align: center;
+                font-size: 1.5em;
+                font-weight: bold;
+                margin-bottom: 20px;
+                padding: 0 10px;
+                color: #ecf0f1;
+            }
+
+            .nav-link {
+                padding: 15px 20px;
+                cursor: pointer;
+                text-decoration: none;
+                color: #bdc3c7;
+                border-left: 5px solid transparent;
+                transition: all 0.3s ease;
+            }
+
+            .nav-link:hover {
+                background-color: #34495e;
+            }
+
+            .nav-link.active {
+                background-color: #34495e;
+                color: white;
+                border-left-color: #3498db;
+            }
+
+            /* --- Main Content Area --- */
+            .content-area {
+                flex-grow: 1;
+                display: flex;
+                flex-direction: column;
+                background-color: white;
+                position: relative; /* Needed for absolute positioning of chat bar */
+            }
+
+            /* Space for the chat bar at the bottom */
+            #home-content, #resources-content, #chat-content {
+                padding-bottom: 70px;
+            }
+
+            /* --- Tab Content --- */
+            .tab-content {
+                flex-grow: 1;
+                padding: 20px;
+                overflow-y: auto;
+                display: none;
+            }
+
+            .tab-content.active {
+                display: block;
+            }
+
+            /* --- Home Tab (Map) --- */
+            #map {
+                height: 100%;
+                width: 100%;
+                min-height: 400px;
+            }
+
+            #home-content {
+                height: 100%;
+                padding: 0;
+            }
+
+            /* --- Chat Tab (Chatbot UI) --- */
+            #chat-content {
+                display: flex;
+                flex-direction: column;
+                height: 100%;
+                padding: 0;
+            }
+
+            /* New global container for chat elements */
+            .chat-container-global {
+                position: absolute;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                display: none; /* Hidden by default */
+                flex-direction: column;
+                z-index: 10;
+            }
+
+            .chat-window {
+                flex-grow: 1;
+                overflow-y: auto;
+                padding: 15px;
+                border: 1px solid #ddd;
+                background-color: #f9f9f9;
+                margin-bottom: 10px;
+                border-radius: 5px;
+            }
+
+            .chat-input-container {
+                display: flex;
+                padding: 10px;
+                border-top: 1px solid #eee;
+                background-color: white;
+            }
+
+            #chat-input {
+                flex-grow: 1;
+                padding: 10px;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                margin-right: 10px;
+            }
+
+            #send-btn {
+                padding: 10px 15px;
+                background-color: #3498db;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                transition: background-color 0.3s;
+            }
+
+            #send-btn:hover {
+                background-color: #2980b9;
+            }
+
+            .message-user, .message-bot {
+                margin-bottom: 10px;
+                padding: 8px 12px;
+                border-radius: 15px;
+                max-width: 70%;
+            }
+
+            .message-user {
+                background-color: #d1e7dd;
+                align-self: flex-end;
+                margin-left: auto;
+            }
+
+            .message-bot {
+                background-color: #f0f0f0;
+                align-self: flex-start;
+                margin-right: auto;
+            }
+        </style>
+    </head>
+    <body>
+
+        <div class="sidebar">
+            <div class="sidebar-title">Cvclone</div>
+            <a class="nav-link active" data-tab="home" onclick="openTab('home')">Home</a>
+            <a class="nav-link" data-tab="resources" onclick="openTab('resources')">Resources</a>
+            <a class="nav-link" data-tab="chat" onclick="openTab('chat')">Chat</a>
+        </div>
+
+        <div class="content-area">
+
+            <div id="home-content" class="tab-content active">
+                <div id="map"></div>
+            </div>
+
+            <div id="resources-content" class="tab-content">
+                <h2>Resources</h2>
+                <p>This tab is currently blank.</p>
+            </div>
+
+                    <div id="chat-content" class="tab-content">
+            </div>
+            
+            <div class="chat-container-global" id="global-chat-container">
+                <div class="chat-window" id="chat-window">
+                    <div class="message-bot">Hello! I'm the Cvclone Chatbot. How can I help you?</div>
+                </div>
+                <div class="chat-input-container">
+                    <input type="text" id="chat-input" placeholder="Type your message...">
+                    <button id="send-btn" onclick="sendMessage()">Send</button>
+                </div>
+            </div>
+
+        </div>
+
+        <script>
+            // --- DOM References ---
+            const tabContents = document.querySelectorAll('.tab-content');
+            const navLinks = document.querySelectorAll('.nav-link');
+            const globalChatContainer = document.getElementById('global-chat-container');
+            const chatWindow = document.getElementById('chat-window');
+            const chatContent = document.getElementById('chat-content');
+
+
+            function openTab(tabName) {
+                // 1. Deactivate all tabs and nav links
+                tabContents.forEach(content => content.classList.remove('active'));
+                navLinks.forEach(link => link.classList.remove('active'));
+
+                // 2. Activate the selected tab content and navigation link
+                document.getElementById(tabName + '-content').classList.add('active');
+                document.querySelector(`.nav-link[data-tab="${tabName}"]`).classList.add('active');
+
+                // 3. Conditional Chat Visibility Logic
+                if (tabName === 'home' || tabName === 'chat') {
+                    
+                    // Attach the chat container to the bottom of the content-area and make it visible.
+                    globalChatContainer.style.display = 'flex';
+                    
+                    if (tabName === 'chat') {
+                        // FULL CHAT MODE: The chat window should fill the full chat-content tab.
+                        chatContent.appendChild(globalChatContainer);
+                        globalChatContainer.style.position = 'static'; 
+                        globalChatContainer.style.flexGrow = '1';
+                        // Show the chat history window
+                        chatWindow.style.display = 'flex';
+                        
+                    } else if (tabName === 'home') {
+                        // HOME TAB MODE: Only the chat input bar should be visible at the bottom of the map.
+                        document.querySelector('.content-area').appendChild(globalChatContainer);
+                        globalChatContainer.style.position = 'absolute'; // Absolute position to the bottom
+                        globalChatContainer.style.flexGrow = '0';
+                        // Hide the chat history window, show only the input bar
+                        chatWindow.style.display = 'none';
+
+                        // Call map initialization
+                        setTimeout(() => initMap(), 100); 
+                    }
+                    
+                    // Scroll to bottom (only needed when window is visible)
+                    if (chatWindow.style.display !== 'none') {
+                         chatWindow.scrollTop = chatWindow.scrollHeight;
+                    }
+
+                } else {
+                    // RESOURCES TAB: Hide the global chat container completely
+                    globalChatContainer.style.display = 'none';
+                }
+            }
+
+            // --- Google Maps Logic ---
+            let map;
+
+            function initMap() {
+                const mapDiv = document.getElementById('map');
+                if (!mapDiv) return;
+
+                if (!map) {
+                    const initialPos = { lat: 28.5383, lng: -81.3792 };
+                    map = new google.maps.Map(mapDiv, {
+                        center: initialPos,
+                        zoom: 10,
+                        mapId: 'DEMO_MAP_ID',
+                    });
+                    new google.maps.Marker({
+                        position: initialPos,
+                        map,
+                        title: "Project Location Area",
+                    });
+                } else {
+                    google.maps.event.trigger(map, 'resize');
+                }
+            }
+
+            // --- Chatbot Logic (Mock) ---
+            function sendMessage() {
+                const input = document.getElementById('chat-input');
+                const messageText = input.value.trim();
+                const chatWindow = document.getElementById('chat-window');
+
+                if (messageText === "") return;
+
+                // 1. Display user message
+                const userMessageDiv = document.createElement('div');
+                userMessageDiv.className = 'message-user';
+                userMessageDiv.textContent = messageText;
+                chatWindow.appendChild(userMessageDiv);
+
+                // Clear input
+                input.value = '';
+
+                // 2. Mock bot response (after a short delay) - using Cerberus context
+                setTimeout(() => {
+                    const botMessageDiv = document.createElement('div');
+                    botMessageDiv.className = 'message-bot';
+
+                    let response;
+                    if (messageText.toLowerCase().includes("cerberus")) {
+                        response = "Cerberus is your multi-agent system using YOLO and Ollama! Let's talk LangGraph.";
+                    } else if (messageText.toLowerCase().includes("langgraph")) {
+                        response = "LangGraph is great for defining stateful, dynamic workflows for agentic systems.";
+                    } else if (messageText.toLowerCase().includes("map")) {
+                        response = "The map shows the general location for your Raspberry Pi camera module.";
+                    } else {
+                        response = `Understood: "${messageText}". I'll process this general chat query.`;
+                    }
+
+                    botMessageDiv.textContent = response;
+                    chatWindow.appendChild(botMessageDiv);
+
+                    // 3. Scroll to the bottom of the chat window
+                    chatWindow.scrollTop = chatWindow.scrollHeight;
+
+                }, 500);
+
+                // Scroll to the bottom immediately after user sends a message
+                chatWindow.scrollTop = chatWindow.scrollHeight;
+
+            }
+
+            // Allow sending message with Enter key
+            document.getElementById('chat-input').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+
+            // --- Initialization ---
+            document.addEventListener('DOMContentLoaded', () => {
+                // Initialize the map and chat logic for the default 'home' tab
+                openTab('home');
+
+                // Add event listener for dynamic resizing (good practice)
+                window.addEventListener('resize', () => {
+                    if (map) {
+                        google.maps.event.trigger(map, 'resize');
+                    }
+                });
+            });
+
+        </script>
+
+        <script
+            src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBQQhjLjjYo4CCV3yil5JBCxpoBOz7qExY&callback=initMap"
+            defer
+        ></script>
+
+    </body>
+    </html>
+    """)
+
+    # Save the content to an HTML file
+    file_name = "cvclone.html"
+    try:
+        with open(file_name, "w") as f:
+            f.write(html_content.strip())
+        
+        print(f"✅ Successfully generated '{file_name}'.")
+        print("Open the file in your web browser to test the dynamic chat visibility.")
+
+    except Exception as e:
+        print(f"❌ An error occurred while writing the file: {e}")
+
+# Run the function to generate the file
+generate_cvclone_page_with_chat_logic()
