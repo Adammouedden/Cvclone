@@ -1,3 +1,5 @@
 **/shards/
 .venv
 __pycache__/
+**/gemini-mvp-sa.json
+*Zone.Identifier*

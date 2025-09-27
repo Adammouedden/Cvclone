@@ -21,13 +21,12 @@ Responsibilities:
 - Provide a tiny in-memory TTL cache (default ~120s)
 - (Optional) expose a small HTTP endpoint for A2A-style consumption
 """
-import os, time, requests
+import os, time
 from flask import Flask, request, jsonify
 
 from dotenv import load_dotenv, find_dotenv
 load_dotenv(find_dotenv())
 
-from __future__ import annotations
 import os, time, math, re
 from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, timezone
@@ -320,32 +319,29 @@ def get_snapshot(lat: float,
             return None
 
     # usage
-    hf = _safe_tool("getForecast", {"lat": lat, "lon": lon, "hourly": True}) if hourly else None
-    df = _safe_tool("getForecast", {"lat": lat, "lon": lon, "hourly": False}) if daily else None
-    ar = _safe_tool("getAlerts", {"lat": lat, "lon": lon}) or {"features": []}
-
     # 1) Hourly periods (optional)
-    if hourly:
-        hf = _safe_tool("getForecast", {"lat": lat, "lon": lon, "hourly": True}) if hourly else None
-        # Keep track of the actual URL we fetched for transparency
-        # The tool returns the full forecast JSON; its 'id' is the canonical URL,
-        # or you can store the `@id`/`forecastGenerator` as metadata. If absent,
-        # we skip adding a source here.
+    hf = _safe_tool("getForecast", {"lat": lat, "lon": lon, "hourly": True}) if hourly else None
+    if hourly and hf is None:
+        raise RuntimeError("Tool 'nws/getForecast' (hourly=True) failed or returned no data")
+    if isinstance(hf, dict):
         src_url = hf.get("id") or hf.get("@id") or ((hf.get("_meta") or {}).get("resolved_url"))
         if isinstance(src_url, str):
             sources.append(src_url)
         hourly_periods = (hf.get("properties") or {}).get("periods") or []
 
     # 2) Daily periods (optional)
-    if daily:
-        df = _safe_tool("getForecast", {"lat": lat, "lon": lon, "hourly": False}) if daily else None
+    df = _safe_tool("getForecast", {"lat": lat, "lon": lon, "hourly": False}) if daily else None
+    if daily and df is None:
+        raise RuntimeError("Tool 'nws/getForecast' (hourly=False) failed or returned no data")
+    if isinstance(df, dict):
         src_url = df.get("id") or df.get("@id") or ((df.get("_meta") or {}).get("resolved_url"))
         if isinstance(src_url, str):
             sources.append(src_url)
         daily_periods = (df.get("properties") or {}).get("periods") or []
 
-    # 3) Alerts (always nice to have)
+    # 3) Alerts
     ar = _safe_tool("getAlerts", {"lat": lat, "lon": lon}) or {"features": []}
+
 
     # The alerts GeoJSON has its own `@context`/`type`; store the query URL instead.
     # Since our tool server constructed it, we don't have the raw URL here;
@@ -441,7 +437,9 @@ def skill_get_snapshot():
         data = get_snapshot(lat=float(lat), lon=float(lon), hourly=hourly, daily=daily)
         return jsonify(data)
     except Exception as e:
-        return jsonify({"error": str(e)}), 502
+        import traceback; traceback.print_exc()
+        return jsonify({"error": f"{type(e).__name__}: {e}"}), 502
+
 
 if __name__ == "__main__":
     # Run this only if you need a quick local HTTP endpoint for your orchestrators.
