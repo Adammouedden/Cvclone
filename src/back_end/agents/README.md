@@ -2,7 +2,7 @@
 
 ## A) Core Data Plane (feeds for agents)
 
-- **Tracks / Cones / Watches & Warnings** → National Hurricane Center (NHC) GIS layers (GeoJSON/tiles).  
+- **Tracks / Cones / Watchesa & Warnings** → National Hurricane Center (NHC) GIS layers (GeoJSON/tiles).  
 - **Local Forecasts & Alerts** → NWS API (`api.weather.gov`, CAP alerts).  
 - **Flood Risk Context** → FEMA National Flood Hazard Layer (NFHL).  
 - **Historical Storms** → HURDAT2 / IBTrACS (training + ground truth).  
