@@ -69,20 +69,22 @@ PAGE = """
   {% if result %}
     <div class="card">
       <h2>Suggested shops — {{ city_label }}</h2>
-      {% if result.shops %}
+      {% if result and result["shops"] %}
         <table>
-          <thead><tr><th>Shop</th><th>ETA</th><th>Distance</th><th>Fulfills</th></tr></thead>
+          <thead>
+            <tr><th>Shop</th><th>ETA</th><th>Distance</th><th>Fulfills</th></tr>
+          </thead>
           <tbody>
-            {% for s in result.shops %}
+            {% for s in result["shops"] %}
               <tr>
-                <td><strong>{{ s.name }}</strong> <small class="muted">({{ s.brand }})</small></td>
-                <td>{{ s.eta_minutes }} min</td>
-                <td>{{ s.distance_km }} km</td>
+                <td><strong>{{ s["name"] }}</strong> <small class="muted">({{ s["brand"] }})</small></td>
+                <td>{{ s["eta_minutes"] }} min</td>
+                <td>{{ s["distance_km"] }} km</td>
                 <td>
                   {% set fulfilled = [] %}
-                  {% for it in s.items %}
-                    {% if it.can_fulfill and it.can_fulfill > 0 %}
-                      {% set _ = fulfilled.append(it.name ~ " ×" ~ it.can_fulfill) %}
+                  {% for it in s["items"] %}
+                    {% if it["can_fulfill"] and it["can_fulfill"] > 0 %}
+                      {% set _ = fulfilled.append(it["name"] ~ " ×" ~ it["can_fulfill"]) %}
                     {% endif %}
                   {% endfor %}
                   {{ fulfilled|join(", ") if fulfilled else "—" }}
@@ -92,14 +94,15 @@ PAGE = """
           </tbody>
         </table>
         <p class="muted">Routing notes:
-          {% for r in result.routes %}
-            <br>• {{ r.to }} — {{ r.distance_km }} km / {{ r.eta_minutes }} min{% if r.avoid and r.avoid|length>0 %} (avoid: {{ r.avoid|join("; ") }}){% endif %}
+          {% for r in result["routes"] %}
+            <br>• {{ r["to"] }} — {{ r["distance_km"] }} km / {{ r["eta_minutes"] }} min
+            {% if r["avoid"] and r["avoid"]|length > 0 %} (avoid: {{ r["avoid"]|join("; ") }}){% endif %}
           {% endfor %}
         </p>
       {% else %}
         <p>No shops found in radius.</p>
       {% endif %}
-      <p class="muted">Sources: {{ (result.sources or [])|join(", ") }}</p>
+      <p class="muted">Sources: {{ (result["sources"] or [])|join(", ") }}</p>
     </div>
   {% endif %}
 </body>
