@@ -58,6 +58,48 @@ def getCapAlert():
     except Exception as e:
         return jsonify({"status":"error","error": str(e)}), 502
 
+@app.post("/tools/getForecast")
+def getForecast():
+    b = request.get_json(force=True) or {}
+    lat, lon = b.get("lat"), b.get("lon")
+    hourly = bool(b.get("hourly", False))  # default False
+
+    # Basic validation
+    if lat is None or lon is None:
+        return jsonify({"status":"error","error":"lat/lon required"}), 400
+    try:
+        # Normalize to string to avoid repr issues like many decimals
+        lat_s, lon_s = str(lat), str(lon)
+
+        # 1) Resolve the canonical forecast URL(s) for this point
+        points = _get(f"{BASE}/points/{lat_s},{lon_s}")  # GeoJSON
+        props = (points or {}).get("properties", {})
+        if not props:
+            return jsonify({"status":"error","error":"NWS /points response missing 'properties'"}), 502
+
+        url = props.get("forecastHourly") if hourly else props.get("forecast")
+        if not url:
+            which = "forecastHourly" if hourly else "forecast"
+            return jsonify({"status":"error","error": f"NWS /points missing '{which}' URL"}), 502
+
+        # 2) Fetch the forecast payload at that canonical URL
+        data = _get(url)
+
+        # attach the URL we actually fetched (non-destructive)
+        if isinstance(data, dict):
+            data.setdefault("_meta", {})["resolved_url"] = url
+        
+        # 3) Return raw NWS forecast (your Forecast agent will normalize)
+        return jsonify({"status": "ok", "data": data})
+
+    except requests.Timeout:
+        return jsonify({"status":"error","error":"NWS request timed out"}), 504
+    except requests.HTTPError as e:
+        # Bubble up upstream status if possible
+        return jsonify({"status":"error","error": f"NWS HTTP error: {e}"}), 502
+    except Exception as e:
+        return jsonify({"status":"error","error": str(e)}), 502
+
 if __name__ == "__main__":
     print("🚀 NWS tool server on http://127.0.0.1:7010")
     app.run(host="0.0.0.0", port=7010)
