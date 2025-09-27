@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from flask import Flask, request, jsonify
 
 # calls the resources tool server through your shared client
-from back_end.mcp_client import call_tool
+from back_end.mcp.client.mcp_client import call_tool
 
 # ----------------------------
 # Config
