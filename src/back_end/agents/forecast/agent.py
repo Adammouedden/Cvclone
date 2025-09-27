@@ -21,6 +21,11 @@ Responsibilities:
 - Provide a tiny in-memory TTL cache (default ~120s)
 - (Optional) expose a small HTTP endpoint for A2A-style consumption
 """
+import os, time, requests
+from flask import Flask, request, jsonify
+
+from dotenv import load_dotenv, find_dotenv
+load_dotenv(find_dotenv())
 
 from __future__ import annotations
 import os, time, math, re
