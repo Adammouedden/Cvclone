@@ -4,11 +4,9 @@ try:
 except Exception:
     CORS = None
 import os
-from dotenv import load_dotenv
-load_dotenv()
 
 # Import the helper from chat_cli
-from chat_cli import generate_reply
+from agents.base_agent import Agent
 
 app = Flask(__name__)
 # Enable CORS if flask_cors is available. This allows the frontend (served on another port)
@@ -16,6 +14,8 @@ app = Flask(__name__)
 if CORS:
     CORS(app, resources={r"/api/*": {"origins": "*"}})
 
+civilian_agent = Agent(civilian=1)
+enterprise_agent = Agent(civilian=0)
 
 # If flask_cors is not installed, add a simple after_request hook and ensure
 # each route accepts OPTIONS so preflight requests succeed.
@@ -38,7 +38,7 @@ def civilian_chat():
     if not text:
         return jsonify({'error': 'No text provided'}), 400
     try:
-        reply = generate_reply(text, civilian=1)
+        reply = civilian_agent.generate_reply(text)
         return jsonify({'reply': reply})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -55,7 +55,7 @@ def enterprise_chat():
     if not text:
         return jsonify({'error': 'No text provided'}), 400
     try:
-        reply = generate_reply(text, civilian=0)
+        reply = enterprise_agent.generate_reply(text)
         return jsonify({'reply': reply})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
