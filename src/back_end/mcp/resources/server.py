@@ -1,27 +1,54 @@
 from dotenv import load_dotenv, find_dotenv
 load_dotenv(find_dotenv())
 
-import os, time, requests
+import os
 from flask import Flask, request, jsonify
 
-# back_end/mcp/resources/server.py
-from dotenv import load_dotenv, find_dotenv
-load_dotenv(find_dotenv())
-
-import os, time, requests
-from flask import Flask, request, jsonify
 from back_end.mcp.resources.adapters.fetch import fetch_once
-import back_end.mcp.resources.adapters.parse as parse_adapters  # <-- change
+import back_end.mcp.resources.adapters.parse as parse_adapters
+import back_end.mcp.resources.adapters.search as search_adapter
+
 
 app = Flask(__name__)
 
 @app.post("/tools/searchResources")
 def search_resources():
     b = request.get_json(force=True) or {}
-    rtype = (b.get("type") or "").lower()
+    rtype = (b.get("type") or "").lower().strip()
     seeds = b.get("seed_urls") or []
-    # MVP: just echo seeds for now; wire SERP later
-    return jsonify({"status": "ok", "data": {"urls": seeds, "type": rtype}})
+    q = (b.get("q") or "").strip() or None
+    near = b.get("near")
+    open_mode = bool(b.get("open"))
+    max_results = int(b.get("max_results") or os.getenv("RESOURCE_SEARCH_MAX", "30"))
+    allow_hosts = b.get("allow_hosts") or []
+    deny_hosts = b.get("deny_hosts") or []
+
+    result = search_adapter.search_urls(
+        rtype=rtype,
+        near=near,
+        seeds=seeds,
+        q=q,
+        open_mode=open_mode,
+        max_results=max_results,
+        allow_hosts=allow_hosts,
+        deny_hosts=deny_hosts
+    )
+
+    # ----------------------------------------------------------------------
+    # FIX: The previous code was failing with KeyError: 'urls' if 
+    # search_adapter.search_urls() returned a dictionary without a 'urls' key.
+    # We now use .get("urls", []) to access it safely and prevent the 500 error.
+    # ----------------------------------------------------------------------
+    urls = result.get("urls", []) 
+
+    return jsonify({
+        "status": "ok",
+        "data": {
+            "urls": urls,
+            "type": rtype,
+            **{k: v for k, v in result.items() if k != "urls"} # THIS LINE WAS CHANGED
+        }
+    })
 
 @app.post("/tools/fetchUrl")
 def fetch_url():
