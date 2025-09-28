@@ -266,6 +266,7 @@
 
         // --- Google Maps Logic ---
         let map;
+        let imageOverlay = null; // Variable to hold the GroundOverlay object
 
         function initMap() {
             // Check if the map div exists and is visible
@@ -274,7 +275,7 @@
 
             // Only create the map if it hasn't been created yet
             if (!map) {
-                // Default location: Central Florida, near the project's likely context
+                // Default location: Central Florida (using your existing values)
                 const initialPos = { lat: 28.5383, lng: -81.3792 };
 
                 map = new google.maps.Map(mapDiv, {
@@ -289,11 +290,67 @@
                     map,
                     title: "Project Location Area",
                 });
+
+                // ⭐ NEW: Load the image overlay immediately after map initialization
+                // Mock coordinates for the image overlay (e.g., covering a 1-mile square)
+                const imageBounds = {
+                    north: 28.5483, // Slightly north of center
+                    south: 28.5283, // Slightly south
+                    east: -81.3692,  // Slightly east
+                    west: -81.3892,  // Slightly west
+                };
+                
+                // Mock image URL (In a real system, this would be your API endpoint)
+                const imageUrl = './ultimateimage.png'; // Mock image for illustration (e.g., a security camera icon)
+
+                // Call the function to place the image overlay
+                placeImageOverlay(imageUrl, imageBounds);
+
             } else {
                 // For existing map, this might trigger a resize if needed
                 google.maps.event.trigger(map, 'resize');
             }
         }
+
+        // ⭐ NEW FUNCTION: Fetches and places the image as a GroundOverlay
+        function placeImageOverlay(imageUrl, bounds) {
+            if (map && imageOverlay) {
+                // Remove existing overlay before placing a new one (e.g., when updating feed)
+                imageOverlay.setMap(null);
+            }
+
+            // Convert the plain bounds object into a google.maps.LatLngBounds object
+            const latLngBounds = new google.maps.LatLngBounds(
+                new google.maps.LatLng(bounds.south, bounds.west),
+                new google.maps.LatLng(bounds.north, bounds.east)
+            );
+
+            // Create the GroundOverlay
+            imageOverlay = new google.maps.GroundOverlay(
+                imageUrl,
+                latLngBounds,
+                {
+                    map: map, // Attaches the overlay to the map object
+                    opacity: 0.8 // Optional: make it slightly transparent
+                }
+            );
+
+            console.log(`GroundOverlay placed: ${imageUrl}`);
+        }
+
+
+        // You would typically use a function like this to dynamically update the image URL:
+        
+        function updateCameraFeedOverlay() {
+            // 1. Use a local image file (place ultimateimage.png in the same folder as this HTML file)
+            const latestImageUrl = './ultimateimage.png';
+            
+            // 2. Define the bounds where the Pi camera is located (must be hardcoded or fetched dynamically)
+            const cameraBounds = { north: 28.5483, south: 28.5283, east: -81.3692, west: -81.3892 };
+            
+            placeImageOverlay(latestImageUrl, cameraBounds);
+        }
+        
 
         // --- Chatbot Logic (Mock) ---
         function sendMessage() {
