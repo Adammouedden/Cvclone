@@ -72,10 +72,11 @@ def parse_endpoint():
     if not url or not rtype:
         return jsonify({"status": "error", "error": "url and type required"}), 400
     try:
-        items = parse_adapters.parse_resources(url, content, ctype, rtype)
-        return jsonify({"status": "ok", "data": {"items": items}})
+        data = parse_adapters.parse_resources(url, content, ctype, rtype)  # returns {"items": [...], "next_urls": [...]}
+        return jsonify({"status": "ok", "data": data})
     except Exception as e:
         return jsonify({"status": "error", "error": str(e)}), 502
+
 
 if __name__ == "__main__":
     port = int(os.getenv("RESOURCES_PORT", "7020"))

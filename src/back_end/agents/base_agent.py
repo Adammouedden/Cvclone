@@ -1,13 +1,16 @@
-# chat_cli.py
+#Imports
 import os
 from google import genai
+from google.genai import types
+from google.adk.agents import ParallelAgent, LlmAgent
+
+#Agent tools
+from news.news_tool import fetch_news
 
 from dotenv import load_dotenv
 load_dotenv()
 
 API_KEY = os.getenv("GEMINI_API")  # set this in your shell first
-client = genai.Client(api_key=API_KEY)
-
 MODEL = "gemini-2.5-flash"
 
 system_prompt = [""" You are an expert assistant specializing in risk analysis and preparedness for natural disasters,
@@ -41,24 +44,35 @@ system_prompt = [""" You are an expert assistant specializing in risk analysis a
                     """
                 ]
 
-def generate_reply(message: str, civilian=0, history=None) -> str:
-    """Generate a single reply for the supplied message.
+class Agent():
+    def __init__(self, civilian=0):
+        self.client = genai.Client(api_key=API_KEY)
+        self.history = []
 
-    This is a non-interactive helper intended for programmatic use by a web
-    server. It keeps the system prompt, appends the provided message and
-    returns the assistant text.
-    """
-    if history is None:
         if civilian:
-            history = [system_prompt[0]]
+            self.history.append(system_prompt[0])
         else:
-            history = [system_prompt[1]]
+            self.history.append(system_prompt[1])
 
-    # Keep the history simple: system prompt + user message
-    history = list(history)
-    history.append(message)
-    resp = client.models.generate_content(
-        model=MODEL,
-        contents=history,
-    )
-    return resp.text
+    def generate_reply(self, message: str) -> str:
+        """Generate a single reply for the supplied message.
+
+        This is a non-interactive helper intended for programmatic use by a web
+        server. It keeps the system prompt, appends the provided message and
+        returns the assistant text.
+        """
+
+        # Keep the history simple: system prompt + user message
+        self.history.append(message)
+        resp = self.client.models.generate_content(
+            model=MODEL,
+            contents=str(self.history),
+        )
+
+        self.history.append(resp.text)
+        return resp.text
+    
+    def civilian_agent():
+        civilian_tool_box = ParallelAgent(name="CivillianAgent", sub_agents=[fetch_news],
+                                          description="This agent runs these tools in parallel to quickly help civillians prepare for hurricanes")
+        

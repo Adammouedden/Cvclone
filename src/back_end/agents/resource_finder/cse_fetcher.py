@@ -1,6 +1,6 @@
 # back_end/agents/resource_finder/cse_fetcher.py
 from __future__ import annotations
-import os, time, urllib.parse, urllib.request, json
+import os, sys, time, urllib.parse, urllib.request, json
 from typing import List, Dict, Any
 
 CSE_KEY = os.getenv("GOOGLE_CSE_KEY")
@@ -40,12 +40,15 @@ def _mk_queries(county: Dict[str, str], rtype: str) -> List[str]:
 def cse_discover_urls(county: Dict[str, str], rtype: str) -> List[str]:
     urls: List[str] = []
     for q in _mk_queries(county, rtype):
+        # ================ ADD THIS PRINT STATEMENT ================
+        print(f"--> EXECUTING CSE SEARCH with query: '{q}'", file=sys.stderr)
+        # ==========================================================
         start = 1
         for _ in range(CSE_PAGES):
             params = {
                 "key": CSE_KEY, "cx": CSE_CX,
                 "q": q, "num": str(CSE_NUM),
-                "dateRestrict": CSE_DATE_RESTRICT,
+                #"dateRestrict": CSE_DATE_RESTRICT,
                 "safe": "off", "start": str(start)
             }
             data = _cse_request(params)
