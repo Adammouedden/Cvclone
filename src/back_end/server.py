@@ -76,19 +76,42 @@ def enterprise_chat():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# NEW: upload endpoint for images (+ optional text)
-@app.route('/api/chat/image', methods=['POST', 'OPTIONS'])
+@app.route('/api/chat/civillian_images', methods=['POST', 'OPTIONS'])
 def upload_images():
     if request.method == 'OPTIONS':
         return make_response('', 200)
 
-    files = request.files.getlist('images')
-    if not files:
+    file = request.files.get('image')
+    if not file:
         return jsonify({'error':'No images provided (field name "images")'}), 400
 
-    
+    image_bytes = file.read()
 
-    return None
+    if not file.mimetype in ('image/png', 'image/jpeg'):
+        return {'error': 'Unsupported type'}, 415
+    
+    response = civilian_agent.respond_to_image(image_bytes)
+
+    return response
+
+
+@app.route('/api/chat/enterprise_images', methods=['POST', 'OPTIONS'])
+def upload_images():
+    if request.method == 'OPTIONS':
+        return make_response('', 200)
+
+    file = request.files.get('image')
+    if not file:
+        return jsonify({'error':'No images provided (field name "images")'}), 400
+
+    image_bytes = file.read()
+
+    if not file.mimetype in ('image/png', 'image/jpeg'):
+        return {'error': 'Unsupported type'}, 415
+    
+    response = enterprise_agent.respond_to_image(image_bytes)
+
+    return response
 
 
 if __name__ == '__main__':
