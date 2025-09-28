@@ -30,8 +30,7 @@ def fetch_news():
                                       sort_by='relevancy',
                                       page=2)
     
-
-    
     return all_articles
 
+    
 

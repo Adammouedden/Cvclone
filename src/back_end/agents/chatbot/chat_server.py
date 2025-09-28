@@ -23,7 +23,20 @@ def civilian_chat():
     if not text:
         return jsonify({'error': 'No text provided'}), 400
     try:
-        reply = generate_reply(text)
+        reply = generate_reply(text, civilian=1)
+        return jsonify({'reply': reply})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
+
+@app.route('/api/chat/enterprise', methods=['POST'])
+def enterprise_chat():
+    data = request.get_json() or {}
+    text = data.get('text', '')
+    if not text:
+        return jsonify({'error': 'No text provided'}), 400
+    try:
+        reply = generate_reply(text, civilian=0)
         return jsonify({'reply': reply})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
