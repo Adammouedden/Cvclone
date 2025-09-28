@@ -2,6 +2,9 @@
 import os, requests, time
 from flask import Flask, request, jsonify
 
+from dotenv import load_dotenv, find_dotenv
+load_dotenv(find_dotenv())
+
 UA = os.getenv("NWS_UA", "HurricaneGuardian/0.1 (+site; email)")
 BASE = "https://api.weather.gov"
 S = requests.Session()

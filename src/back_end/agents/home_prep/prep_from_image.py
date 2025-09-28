@@ -59,6 +59,9 @@ SYSTEM_PROMPT = (
     "Your ONLY output must be a JSON object that conforms to the provided tool schema."
     "Do not add any conversational text or markdown. Keep recommendations short and actionable."
     "Prefer life/property-critical items as priority 'A'. "
+    "For the 'id' field, use a short, snake_case identifier like 'board_windows' or 'secure_patio_furniture'."
+    "For the 'effort' field, provide a time estimate like '30m' or '1-2h'."
+    "In the 'where' field, reference which image shows the issue, for example: 'front windows (image 0)' or 'back patio (image 1)'."
 )
 
 USER_INSTRUCTIONS = (
@@ -87,7 +90,7 @@ def main():
     ap.add_argument("--image", required=True, help="Path to local image (jpg/png/webp)")
     ap.add_argument("--wind-prob", type=float, required=True, help="0..1 probability of TS-force winds")
     ap.add_argument("--surge-zone", required=True, help='e.g., "AE-9", "VE", "X"')
-    ap.add_argument("--model", default="gemini-1.5-flash", help="Gemini vision model (flash/pro)")
+    ap.add_argument("--model", default="models/gemini-2.5-flash", help="Gemini model name")
     ap.add_argument("--out", default="", help="Optional path to save JSON result")
     args = ap.parse_args()
 
