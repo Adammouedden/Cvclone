@@ -128,13 +128,13 @@
         }
 
         #send-btn:hover {
-            background-color: #2980b9;
+            background-color: #7db7dd;
         }
 
         #civilian-send-btn {
             padding: 10px 15px;
-            background-color: #9917bd;
-            color: white;
+            background-color: #1ed3d6;
+            color: black;
             border: none;
             border-radius: 4px;
             cursor: pointer;
@@ -143,8 +143,8 @@
 
         #enterprise-send-btn {
             padding: 10px 15px;
-            background-color: #9917bd;
-            color: white;
+            background-color: #1ed3d6;
+            color: black;
             border: none;
             border-radius: 4px;
             cursor: pointer;
@@ -270,6 +270,43 @@
         .storm-timestamps.active { display: block; }
         .timestamp-item { padding: 6px 8px; cursor: pointer; border-radius: 4px; }
         .timestamp-item:hover { background: #f0f8ff; }
+
+        /* Add-button styles */
+        .add-btn {
+            margin-left: 8px;
+            padding: 8px 10px;
+            background: #2ecc71;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .add-menu {
+            position: absolute;
+            background: white;
+            border: 1px solid #ddd;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+            border-radius: 6px;
+            padding: 6px 8px;
+            z-index: 2000;
+            display: none;
+            min-width: 160px;
+        }
+
+        .add-menu button {
+            display: block;
+            width: 100%;
+            text-align: left;
+            padding: 8px 10px;
+            border: none;
+            background: none;
+            cursor: pointer;
+        }
+
+        .add-menu button:hover { background: #f6f9ff; }
     </style>
 </head>
 <body>
@@ -277,7 +314,6 @@
         <div class="sidebar">
         <div class="sidebar-title">Cvclone</div>
         <a class="nav-link active" data-tab="home" onclick="openTab('home')">Home</a>
-        <a class="nav-link" data-tab="resources" onclick="openTab('resources')">Resources</a>
         <a class="nav-link" data-tab="civilian" onclick="openTab('civilian')">Civilian</a>
         <a class="nav-link" data-tab="enterprise" onclick="openTab('enterprise')">Enterprise</a>
         <a class="nav-link" data-tab="hurricanes" onclick="openTab('hurricanes')">Hurricanes</a>
@@ -303,6 +339,13 @@
             <div class="chat-input-container">
                 <input type="text" id="civilian-chat-input" placeholder="Ask the civilian assistant...">
                 <button id="civilian-send-btn">Send</button>
+                <button id="civilian-add-btn" class="add-btn" title="More options" aria-label="More options">
+                    <!-- plus icon (SVG) -->
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+                <input type="file" id="civilian-file-input" accept="image/*" style="display:none" />
             </div>
         </div>
 
@@ -315,6 +358,12 @@
             <div class="chat-input-container">
                 <input type="text" id="enterprise-chat-input" placeholder="Ask the enterprise assistant...">
                 <button id="enterprise-send-btn">Send</button>
+                <button id="enterprise-add-btn" class="add-btn" title="More options" aria-label="More options">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+                <input type="file" id="enterprise-file-input" accept="image/*" style="display:none" />
             </div>
         </div>
 
@@ -336,7 +385,7 @@
                         <img src="./thegang.jpg" alt="Gang photo" class="about-image">
                         <img src="./thegangfeelingsilly.jpg" alt="Silly gang" class="about-image">
                     </div>
-                    <p>Hello — this project, Cvclone, is an experimental interface combining mapping, live overlays, and chat assistants. It demonstrates multi-agent coordination, realtime overlays, and a simple frontend to prototype ideas. This page is a short bio area where you can describe the project goals, background, and contact info.</p>
+                    <p>Cvclone is a prototype web app for hurricane/disaster preparedness that combines an interactive Google Maps frontend (image overlays, storm track visualizations, Civilian/Enterprise chat) with a set of backend agents for routing, supply planning, and a Gemini-powered chatbot.</p>
                 </div>
                 <div class="about-right">
                     <h2>Credits</h2>
@@ -346,11 +395,6 @@
                         <h4>Sofia Flores</h4>    
                 </div>
             </div>
-        </div>
-
-        <div id="resources-content" class="tab-content">
-            <h2>Resources</h2>
-            <p>This tab is currently blank.</p>
         </div>
     </div>
 
@@ -609,6 +653,62 @@
         // Wire enterprise chat
         document.getElementById('enterprise-send-btn').addEventListener('click', () => sendChatMessage('enterprise-chat-input', 'enterprise-chat-window'));
         document.getElementById('enterprise-chat-input').addEventListener('keypress', function(e) { if (e.key === 'Enter') sendChatMessage('enterprise-chat-input', 'enterprise-chat-window'); });
+
+        // --- Add-button (plus) behavior: show small menu with Attach Image / Insert Template ---
+        function createAddMenu() {
+            const menu = document.createElement('div');
+            menu.className = 'add-menu';
+            const attachBtn = document.createElement('button');
+            attachBtn.textContent = 'Attach image';
+            const templateBtn = document.createElement('button');
+            templateBtn.textContent = 'Insert template';
+            menu.appendChild(attachBtn);
+            menu.appendChild(templateBtn);
+            document.body.appendChild(menu);
+            return { menu, attachBtn, templateBtn };
+        }
+
+        const civilianMenuParts = createAddMenu();
+        const enterpriseMenuParts = createAddMenu();
+
+        function showMenuFor(buttonEl, menuParts, inputId) {
+            const rect = buttonEl.getBoundingClientRect();
+            menuParts.menu.style.left = (rect.right - 150) + 'px';
+            menuParts.menu.style.top = (rect.top - 6) + 'px';
+            menuParts.menu.style.display = 'block';
+
+            // attach handlers
+            menuParts.attachBtn.onclick = () => {
+                document.getElementById(inputId + '-file-input').click();
+                menuParts.menu.style.display = 'none';
+            };
+            menuParts.templateBtn.onclick = () => {
+                const input = document.getElementById(inputId);
+                input.value = 'I request assistance for my area: [city], [state]. Please advise.';
+                menuParts.menu.style.display = 'none';
+                input.focus();
+            };
+        }
+
+        // Hook add buttons
+        const civAddBtn = document.getElementById('civilian-add-btn');
+        const entAddBtn = document.getElementById('enterprise-add-btn');
+        civAddBtn.addEventListener('click', (e) => { showMenuFor(e.currentTarget, civilianMenuParts, 'civilian-chat-input'); });
+        entAddBtn.addEventListener('click', (e) => { showMenuFor(e.currentTarget, enterpriseMenuParts, 'enterprise-chat-input'); });
+
+        // File input handlers: when a file is selected, show a small preview and inject placeholder text
+        document.getElementById('civilian-file-input').addEventListener('change', function(e) {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+            const input = document.getElementById('civilian-chat-input');
+            input.value = `[attached image: ${file.name}]`;
+        });
+        document.getElementById('enterprise-file-input').addEventListener('change', function(e) {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+            const input = document.getElementById('enterprise-chat-input');
+            input.value = `[attached image: ${file.name}]`;
+        });
 
         // --- Initialization ---
         document.addEventListener('DOMContentLoaded', () => {
