@@ -11,14 +11,39 @@ from back_end.agents.resource_finder.cse_fetcher import cse_discover_urls
 from dotenv import load_dotenv, find_dotenv
 load_dotenv(find_dotenv())
 
-import os, time
+import os, time, sys
 from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, timezone
 from flask import Flask, request, jsonify
+from collections import deque
 from urllib.parse import urlparse
+import requests
 
 # calls the resources tool server through your shared client
 from back_end.mcp.client.mcp_client import call_tool
+
+# ==================== PASTE THE COPIED CODE HERE ====================
+UA = os.getenv("RESOURCES_UA", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36")
+TIMEOUT = float(os.getenv("RESOURCES_FETCH_TIMEOUT", "10"))
+
+def fetch_once(url: str) -> dict:
+    headers = {
+        "User-Agent": UA,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Connection": "close",
+    }
+    r = requests.get(url, headers=headers, timeout=TIMEOUT, allow_redirects=True)
+    r.raise_for_status()
+    ctype = r.headers.get("Content-Type", "").split(";")[0].strip().lower() or "text/html"
+    return {
+        "url": r.url,
+        "status": r.status_code,
+        "content_type": ctype,
+        "content": r.text if "text" in ctype or "json" in ctype else "",
+        "fetched_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
+# =====================================================================
 
 # ----------------------------
 # Config
@@ -80,6 +105,47 @@ def get_snapshot(
       assemble items; compute distance if coordinates present
       sort by: items with distance first (nearest), then .gov preference
     """
+    # ==================== DEMO MODE FALLBACK ====================
+    if os.getenv("DEMO_MODE") == "1":
+        print("--- RUNNING IN DEMO MODE: RETURNING HARDCODED DATA ---", file=sys.stderr)
+        demo_data = {
+            "source": "local_resources_demo",
+            "fetched_at": iso_utc_now(),
+            "location": {"lat": lat, "lon": lon, "radius_km": 35},
+            "resources": [
+                {
+                    "type": "sandbags",
+                    "name": "Miami-Dade Public Works Distribution Site",
+                    "address": "123 Main St, Miami, FL",
+                    "notes": "Limit 10 bags per vehicle. Proof of residency required.",
+                    "link": "https://www.miamidade.gov/global/emergency/hurricane/sandbags.page",
+                    "publisher": "miamidade.gov",
+                    "distance_km": 5.2
+                },
+                {
+                    "type": "shelter",
+                    "name": "American Red Cross Shelter - South Florida",
+                    "address": "456 Oak Ave, Coral Gables, FL",
+                    "notes": "Pets welcome in carriers. Please bring your own bedding.",
+                    "link": "https://www.redcross.org/local/florida/south-florida.html",
+                    "publisher": "redcross.org",
+                    "distance_km": 8.1
+                },
+                {
+                    "type": "food",
+                    "name": "Feeding South Florida - Emergency Pantry",
+                    "address": "789 Palm Blvd, Homestead, FL",
+                    "notes": "Drive-thru distribution. Open 9 AM - 1 PM.",
+                    "link": "https://feedingsouthflorida.org/",
+                    "publisher": "feedingsouthflorida.org",
+                    "distance_km": 22.5
+                }
+            ],
+            "sources": ["demo_data.json"]
+        }
+        return demo_data
+    # =============================================================
+
     types = types or ["shelter", "sandbags", "food"]
     key = (round(float(lat), 4), round(float(lon), 4), int(radius_km), ",".join(types))
     cached = _cache_get(key)
@@ -110,51 +176,90 @@ def get_snapshot(
 
     for t in types: print("CSE discovered", t, len(cse_pool[t]))
 
-    # 1) discover URLs for each resource type
+    # --- PHASE 1: DISCOVER ALL URLs FOR ALL TYPES ---
+    urls_by_type: Dict[str, List[str]] = {t: [] for t in types}
+
     for rtype in types:
-        seeds = []
-        if curated_urls and rtype in curated_urls:
-            seeds = curated_urls[rtype] or []
-        search = call_tool("resources", "searchResources", {"type": rtype, "seed_urls": seeds}) or {}
-        search_urls = (search.get("data") or {}).get("urls") or search.get("urls") or []
-        urls = search_urls + cse_pool[rtype]
-        # de-dupe preserving order
+        # Get curated/seed URLs
+        seeds = (curated_urls.get(rtype) if curated_urls and rtype in curated_urls else []) or []
+        
+        # Get URLs from the search tool
+        search_result = call_tool("resources", "searchResources", {"type": rtype, "seed_urls": seeds}) or {}
+        search_urls = (search_result.get("data") or {}).get("urls") or search_result.get("urls") or []
+        
+        # Combine with URLs discovered from CSE
+        all_urls = search_urls + cse_pool.get(rtype, [])
+        
+        # De-dupe while preserving order
         seen, merged = set(), []
-        for u in urls:
+        for u in all_urls:
             if u not in seen:
-                seen.add(u); merged.append(u)
-        urls = merged
+                seen.add(u)
+                merged.append(u)
+        urls_by_type[rtype] = merged
+
+    # --- PHASE 2: PROCESS URLs TYPE BY TYPE ---
+    MAX_DEPTH = int(os.getenv("RESOURCE_PARSE_MAX_DEPTH", "2"))
+    MAX_FOLLOWS_PER_TYPE = int(os.getenv("RESOURCE_PARSE_MAX_FOLLOWS", "12"))
+
+    def _publisher_from_url(u: str) -> Optional[str]:
+        try:
+            netloc = urlparse(u if "://" in u else f"https://{u}").netloc
+            return netloc or None
+        except Exception:
+            return None
+
+    for rtype, urls in urls_by_type.items():
         if not urls:
             continue
 
-        # 2) fetch + 3) parse per URL
-        def _publisher_from_url(u: str) -> Optional[str]:
-            try:
-                netloc = urlparse(u if "://" in u else f"https://{u}").netloc
-                return netloc or None
-            except Exception:
-                return None
+        # Bounded BFS crawl for this type
+        queue = deque([(u, 0) for u in urls])
+        visited = set()
+        follows_used = 0
 
-        for url in urls:
+        while queue:
+            url, depth = queue.popleft()
+            if url in visited:
+                continue
+            visited.add(url)
+
             try:
-                fetched = call_tool("resources", "fetchUrl", {"url": url}) or {}
-                fdata = fetched.get("data") or fetched  # support both shapes
+                # Call the local function directly, bypassing the tool server
+                fdata = fetch_once(url) 
+                content = fdata.get("content") or ""
+
+                # Ensure you have content to parse
+                if not content:
+                    continue
+
                 parsed = call_tool("resources", "parseResources", {
                     "url": fdata.get("url") or url,
-                    "content": fdata.get("content") or "",
+                    "content": content,
                     "content_type": fdata.get("content_type") or "text/html",
-                    "type": rtype
+                    "type": rtype  # Use the correct rtype for this loop
                 }) or {}
-                pdata = parsed.get("data") or parsed  # if your parser also wraps
+                pdata = parsed.get("data") or parsed
 
                 for it in (pdata.get("items") or []):
                     it.setdefault("type", rtype)
                     it.setdefault("link", url)
                     it.setdefault("publisher", _publisher_from_url(url))
                     items.append(it)
+                    sources.append(url)
 
-                sources.append(url)
-            except Exception:
+                # Follow-up links
+                if depth < MAX_DEPTH and follows_used < MAX_FOLLOWS_PER_TYPE:
+                    for nu in (pdata.get("next_urls") or []):
+                        if nu not in visited:
+                            queue.append((nu, depth + 1))
+                            follows_used += 1
+                            if follows_used >= MAX_FOLLOWS_PER_TYPE:
+                                break
+            except Exception as e:
+                # ==================== ADD THIS PRINT ====================
+                print(f"!!! ERROR: Failed to fetch/parse URL '{url}'. Reason: {e}", file=sys.stderr)
+                # ========================================================
                 continue
 
     # 4) distance calc (if coordinates provided by parsers)
@@ -176,34 +281,19 @@ def get_snapshot(
         seen.add(key2)
         deduped.append(it)
 
-    # 6) filter: if coords exist, enforce radius; otherwise keep (MVP keeps possibly useful items)
+     # 6) filter: if coords exist, enforce radius; otherwise keep (MVP keeps possibly useful items)
     in_radius: List[Dict[str, Any]] = []
     for it in deduped:
         if it.get("distance_km") is None:
-            # keep unknown-distance items in MVP so users see them
-            in_radius.append(it)
+            in_radius.append(it)  # keep unknown-distance items
         elif it["distance_km"] <= float(radius_km):
             in_radius.append(it)
-        diag = {
-        "counties": {"primary": geo.get("primary_county"),
-                    "nearby": len(geo.get("nearby_counties", []))},
-        "cse_urls": {t: len(cse_pool.get(t, [])) for t in types},
-        "sources_count": len(sources),
-        "items_before_dedupe": len(items),
-    }
 
-    result = {
-        "source": "local_resources",
-        "fetched_at": iso_utc_now(),
-        "location": {"lat": float(lat), "lon": float(lon), "radius_km": int(radius_km)},
-        "resources": in_radius,
-        "sources": sorted(set(sources)),
-    }
-    if not in_radius:
-        result["debug"] = diag
-
-    # 7) sort: items with distance first (nearest), prefer .gov domains
-    OFFICIAL_HINTS = ("redcross.org", "feedingamerica.org", ".fl.us", "fema.gov", "ready.gov", "disasterassistance.gov", "foodpantries.org")
+    # 7) sort: items with distance first (nearest), then official-ish domains
+    OFFICIAL_HINTS = (
+        "redcross.org", "feedingamerica.org", ".fl.us", "fema.gov",
+        "ready.gov", "disasterassistance.gov", "foodpantries.org"
+    )
     def _score(it):
         has_dist = 0 if it.get("distance_km") is None else 1
         dist = it.get("distance_km") or 9999.0
@@ -212,9 +302,20 @@ def get_snapshot(
         hint_bonus = -200 if any(pub.endswith(h) or pub.endswith("." + h) for h in OFFICIAL_HINTS) else 0
         return (-has_dist, dist + gov_bonus + hint_bonus)
 
-
     in_radius.sort(key=_score)
 
+    # Prepare diagnostics BEFORE building the final result
+    diag = {
+        "counties": {
+            "primary": geo.get("primary_county"),
+            "nearby": len(geo.get("nearby_counties", [])),
+        },
+        "cse_urls": {t: len(cse_pool.get(t, [])) for t in types},
+        "sources_count": len(sources),
+        "items_before_dedupe": len(items),
+    }
+
+    # Final response (build once)
     result: Dict[str, Any] = {
         "source": "local_resources",
         "fetched_at": iso_utc_now(),
@@ -222,6 +323,8 @@ def get_snapshot(
         "resources": in_radius,
         "sources": sorted(set(sources)),
     }
+    if not in_radius:
+        result["debug"] = diag
 
     _cache_set(key, result)
     return result
