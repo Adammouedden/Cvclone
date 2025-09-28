@@ -1,9 +1,11 @@
-from flask import Flask, request, jsonify, make_response
+from flask import Flask, request, jsonify, make_response, send_from_directory
 try:
     from flask_cors import CORS
 except Exception:
     CORS = None
 import os
+import uuid
+from werkzeug.utils import secure_filename
 
 # Import the helper from chat_cli
 from agents.base_agent import Agent
@@ -17,6 +19,18 @@ if CORS:
 civilian_agent = Agent(civilian=1)
 enterprise_agent = Agent(civilian=0)
 
+# --- Image upload config ---
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16 MB
+UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'uploads')
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+def allowed_file(filename: str) -> bool:
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 # If flask_cors is not installed, add a simple after_request hook and ensure
 # each route accepts OPTIONS so preflight requests succeed.
 @app.after_request
@@ -27,9 +41,13 @@ def add_cors_headers(response):
     response.headers.setdefault('Access-Control-Allow-Headers', 'Content-Type, Authorization')
     return response
 
+# Serve uploaded files
+@app.route('/uploads/<path:filename>')
+def serve_upload(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename, conditional=True)
+
 @app.route('/api/chat/civilian', methods=['POST', 'OPTIONS'])
 def civilian_chat():
-    # Respond to preflight requests immediately
     if request.method == 'OPTIONS':
         return make_response('', 200)
 
@@ -42,11 +60,9 @@ def civilian_chat():
         return jsonify({'reply': reply})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-    
 
 @app.route('/api/chat/enterprise', methods=['POST', 'OPTIONS'])
 def enterprise_chat():
-    # Respond to preflight requests immediately
     if request.method == 'OPTIONS':
         return make_response('', 200)
 
@@ -59,6 +75,43 @@ def enterprise_chat():
         return jsonify({'reply': reply})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+# NEW: upload endpoint for images (+ optional text)
+@app.route('/api/chat/<chat_kind>/upload', methods=['POST', 'OPTIONS'])
+def upload_images(chat_kind):
+    if request.method == 'OPTIONS':
+        return make_response('', 200)
+    if chat_kind not in ('civilian','enterprise'):
+        return jsonify({'error':'Invalid chat kind'}), 400
+
+    files = request.files.getlist('images')
+    if not files:
+        return jsonify({'error':'No images provided (field name "images")'}), 400
+
+    saved, paths = [], []
+    for f in files:
+        if not f or f.filename == '' or not allowed_file(f.filename):
+            return jsonify({'error': f'File type not allowed: {getattr(f,"filename","")}' }), 400
+        ext = f.filename.rsplit('.',1)[1].lower()
+        fname = secure_filename(f"{uuid.uuid4().hex}.{ext}")
+        fpath = os.path.join(app.config['UPLOAD_FOLDER'], fname)
+        f.save(fpath)
+        saved.append({'filename': fname, 'url': f'/uploads/{fname}'})
+        paths.append(fpath)
+
+    text = (request.form.get('text') or '').strip()
+    agent = civilian_agent if chat_kind == 'civilian' else enterprise_agent
+
+    # Try multimodal; fall back to URLs-in-text
+    try:
+        reply = agent.generate_reply(text or "See attached images.", images=[s['url'] for s in saved])
+    except TypeError:
+        prompt = text or "See attached images."
+        if saved: prompt += "\n\nAttached images:\n" + "\n".join(s['url'] for s in saved)
+        reply = agent.generate_reply(prompt)
+
+    return jsonify({'images': saved, 'reply': reply}), 200
+
 
 if __name__ == '__main__':
     port = int(os.getenv('CHAT_SERVER_PORT', 5001))
