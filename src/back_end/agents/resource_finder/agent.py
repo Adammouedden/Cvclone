@@ -4,6 +4,8 @@
 # ================================
 
 from __future__ import annotations
+from back_end.agents.resource_finder.county_resolver import resolve_counties
+from back_end.agents.resource_finder.cse_fetcher import cse_discover_urls
 
 # load .env early
 from dotenv import load_dotenv, find_dotenv
@@ -13,6 +15,7 @@ import os, time
 from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, timezone
 from flask import Flask, request, jsonify
+from urllib.parse import urlparse
 
 # calls the resources tool server through your shared client
 from back_end.mcp.client.mcp_client import call_tool
@@ -86,37 +89,72 @@ def get_snapshot(
     sources: List[str] = []
     items: List[Dict[str, Any]] = []
 
+    geo = resolve_counties(lat, lon, radius_km)
+    candidate_counties = [c for c in [geo.get("primary_county")] if c] + geo.get("nearby_counties", [])
+
+    # Build a per-type URL pool using CSE
+    cse_pool: Dict[str, List[str]] = {t: [] for t in types}
+    for rtype in types:
+        for c in candidate_counties:
+            try:
+                discovered = cse_discover_urls(c, rtype)
+                cse_pool[rtype].extend(discovered)
+            except Exception:
+                continue
+    # de-dupe
+    for rtype in types:
+        cse_pool[rtype] = list(dict.fromkeys(cse_pool[rtype]))
+    
+    print("CSE cfg:", os.getenv("GOOGLE_CSE_KEY") is not None, os.getenv("GOOGLE_CSE_CX"))
+    print("counties:", [c.get("name") for c in candidate_counties])
+
+    for t in types: print("CSE discovered", t, len(cse_pool[t]))
+
     # 1) discover URLs for each resource type
     for rtype in types:
         seeds = []
         if curated_urls and rtype in curated_urls:
             seeds = curated_urls[rtype] or []
         search = call_tool("resources", "searchResources", {"type": rtype, "seed_urls": seeds}) or {}
-        urls = (search.get("urls") or [])
+        search_urls = (search.get("data") or {}).get("urls") or search.get("urls") or []
+        urls = search_urls + cse_pool[rtype]
+        # de-dupe preserving order
+        seen, merged = set(), []
+        for u in urls:
+            if u not in seen:
+                seen.add(u); merged.append(u)
+        urls = merged
         if not urls:
             continue
 
         # 2) fetch + 3) parse per URL
+        def _publisher_from_url(u: str) -> Optional[str]:
+            try:
+                netloc = urlparse(u if "://" in u else f"https://{u}").netloc
+                return netloc or None
+            except Exception:
+                return None
+
         for url in urls:
             try:
                 fetched = call_tool("resources", "fetchUrl", {"url": url}) or {}
+                fdata = fetched.get("data") or fetched  # support both shapes
                 parsed = call_tool("resources", "parseResources", {
-                    "url": fetched.get("url") or url,
-                    "content": fetched.get("content") or "",
-                    "content_type": fetched.get("content_type") or "text/html",
+                    "url": fdata.get("url") or url,
+                    "content": fdata.get("content") or "",
+                    "content_type": fdata.get("content_type") or "text/html",
                     "type": rtype
                 }) or {}
+                pdata = parsed.get("data") or parsed  # if your parser also wraps
 
-                for it in (parsed.get("items") or []):
-                    # Ensure minimal fields exist
+                for it in (pdata.get("items") or []):
                     it.setdefault("type", rtype)
                     it.setdefault("link", url)
-                    it.setdefault("publisher", (url.split("/")[2] if "://" in url else None))
+                    it.setdefault("publisher", _publisher_from_url(url))
                     items.append(it)
 
                 sources.append(url)
-            except Exception as _e:
-                # best-effort: skip bad URLs instead of failing the whole snapshot
+            except Exception:
                 continue
 
     # 4) distance calc (if coordinates provided by parsers)
@@ -146,14 +184,34 @@ def get_snapshot(
             in_radius.append(it)
         elif it["distance_km"] <= float(radius_km):
             in_radius.append(it)
+        diag = {
+        "counties": {"primary": geo.get("primary_county"),
+                    "nearby": len(geo.get("nearby_counties", []))},
+        "cse_urls": {t: len(cse_pool.get(t, [])) for t in types},
+        "sources_count": len(sources),
+        "items_before_dedupe": len(items),
+    }
+
+    result = {
+        "source": "local_resources",
+        "fetched_at": iso_utc_now(),
+        "location": {"lat": float(lat), "lon": float(lon), "radius_km": int(radius_km)},
+        "resources": in_radius,
+        "sources": sorted(set(sources)),
+    }
+    if not in_radius:
+        result["debug"] = diag
 
     # 7) sort: items with distance first (nearest), prefer .gov domains
-    def _score(it: Dict[str, Any]) -> tuple:
+    OFFICIAL_HINTS = ("redcross.org", "feedingamerica.org", ".fl.us", "fema.gov", "ready.gov", "disasterassistance.gov", "foodpantries.org")
+    def _score(it):
         has_dist = 0 if it.get("distance_km") is None else 1
         dist = it.get("distance_km") or 9999.0
         pub = (it.get("publisher") or "")
-        gov_bonus = 0 if not pub.endswith(".gov") else -1000  # negative for ascending
-        return (-has_dist, dist + gov_bonus)
+        gov_bonus = -1000 if pub.endswith(".gov") else 0
+        hint_bonus = -200 if any(pub.endswith(h) or pub.endswith("." + h) for h in OFFICIAL_HINTS) else 0
+        return (-has_dist, dist + gov_bonus + hint_bonus)
+
 
     in_radius.sort(key=_score)
 
