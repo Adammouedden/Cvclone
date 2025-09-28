@@ -77,40 +77,18 @@ def enterprise_chat():
         return jsonify({'error': str(e)}), 500
 
 # NEW: upload endpoint for images (+ optional text)
-@app.route('/api/chat/<chat_kind>/upload', methods=['POST', 'OPTIONS'])
-def upload_images(chat_kind):
+@app.route('/api/chat/image', methods=['POST', 'OPTIONS'])
+def upload_images():
     if request.method == 'OPTIONS':
         return make_response('', 200)
-    if chat_kind not in ('civilian','enterprise'):
-        return jsonify({'error':'Invalid chat kind'}), 400
 
     files = request.files.getlist('images')
     if not files:
         return jsonify({'error':'No images provided (field name "images")'}), 400
 
-    saved, paths = [], []
-    for f in files:
-        if not f or f.filename == '' or not allowed_file(f.filename):
-            return jsonify({'error': f'File type not allowed: {getattr(f,"filename","")}' }), 400
-        ext = f.filename.rsplit('.',1)[1].lower()
-        fname = secure_filename(f"{uuid.uuid4().hex}.{ext}")
-        fpath = os.path.join(app.config['UPLOAD_FOLDER'], fname)
-        f.save(fpath)
-        saved.append({'filename': fname, 'url': f'/uploads/{fname}'})
-        paths.append(fpath)
+    
 
-    text = (request.form.get('text') or '').strip()
-    agent = civilian_agent if chat_kind == 'civilian' else enterprise_agent
-
-    # Try multimodal; fall back to URLs-in-text
-    try:
-        reply = agent.generate_reply(text or "See attached images.", images=[s['url'] for s in saved])
-    except TypeError:
-        prompt = text or "See attached images."
-        if saved: prompt += "\n\nAttached images:\n" + "\n".join(s['url'] for s in saved)
-        reply = agent.generate_reply(prompt)
-
-    return jsonify({'images': saved, 'reply': reply}), 200
+    return None
 
 
 if __name__ == '__main__':
