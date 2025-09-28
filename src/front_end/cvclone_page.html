@@ -17,6 +17,7 @@
         /* --- Sidebar/Navigation --- */
         .sidebar {
             width: 200px;
+            flex: 0 0 200px; /* keep the sidebar a fixed-width flex item so tab content can't resize it */
             background-color: #2c3e50; /* Dark sidebar */
             color: white;
             display: flex;
@@ -59,6 +60,7 @@
             display: flex;
             flex-direction: column;
             background-color: white;
+            min-width: 0; /* allow the content area to shrink inside the flex row without forcing the sidebar to change */
         }
 
         /* --- Tab Content --- */
@@ -246,14 +248,19 @@
             display: flex;
             gap: 12px;
             align-items: flex-start;
+            flex-wrap: wrap;
         }
 
         .about-images img.about-image {
-            width: 50%; /* each image fills half the left column */
+            /* Let images share the available space without forcing horizontal overflow */
+            flex: 1 1 50%;
+            max-width: 50%;
+            width: 100%;
             height: auto;
             border-radius: 8px;
             display: block;
             margin-bottom: 12px;
+            object-fit: cover;
         }
         /* Hurricanes folder UI */
         .hurricane-list {
@@ -483,6 +490,8 @@
     }
 
         function openTab(tabName) {
+            // Hide any open add-menus when switching tabs
+            if (typeof hideAddMenus === 'function') hideAddMenus();
             // Deactivate all tab contents and navigation links
             console.log("(1)Switching a tab:");
             console.log("Tab Contents: ", tabContents);
@@ -665,6 +674,8 @@
             menu.appendChild(attachBtn);
             menu.appendChild(templateBtn);
             document.body.appendChild(menu);
+            // prevent clicks inside the menu from bubbling to document (which would hide menus)
+            menu.addEventListener('click', (ev) => ev.stopPropagation());
             return { menu, attachBtn, templateBtn };
         }
 
@@ -672,17 +683,25 @@
         const enterpriseMenuParts = createAddMenu();
 
         function showMenuFor(buttonEl, menuParts, inputId) {
+            // hide any other menus first
+            hideAddMenus();
             const rect = buttonEl.getBoundingClientRect();
-            menuParts.menu.style.left = (rect.right - 150) + 'px';
+            // Position the menu to the left of the button if near the right edge
+            const menuWidth = 160;
+            let left = rect.right - menuWidth;
+            if (left < 8) left = rect.left;
+            menuParts.menu.style.left = (left) + 'px';
             menuParts.menu.style.top = (rect.top - 6) + 'px';
             menuParts.menu.style.display = 'block';
 
-            // attach handlers
-            menuParts.attachBtn.onclick = () => {
+            // attach handlers (stopPropagation inside menu prevents immediate document click hide)
+            menuParts.attachBtn.onclick = (ev) => {
+                ev.stopPropagation();
                 document.getElementById(inputId + '-file-input').click();
                 menuParts.menu.style.display = 'none';
             };
-            menuParts.templateBtn.onclick = () => {
+            menuParts.templateBtn.onclick = (ev) => {
+                ev.stopPropagation();
                 const input = document.getElementById(inputId);
                 input.value = 'I request assistance for my area: [city], [state]. Please advise.';
                 menuParts.menu.style.display = 'none';
@@ -693,8 +712,21 @@
         // Hook add buttons
         const civAddBtn = document.getElementById('civilian-add-btn');
         const entAddBtn = document.getElementById('enterprise-add-btn');
-        civAddBtn.addEventListener('click', (e) => { showMenuFor(e.currentTarget, civilianMenuParts, 'civilian-chat-input'); });
-        entAddBtn.addEventListener('click', (e) => { showMenuFor(e.currentTarget, enterpriseMenuParts, 'enterprise-chat-input'); });
+        // Stop propagation on add-button clicks so the document-level click handler doesn't hide the menu immediately
+        civAddBtn.addEventListener('click', (e) => { e.stopPropagation(); showMenuFor(e.currentTarget, civilianMenuParts, 'civilian-chat-input'); });
+        entAddBtn.addEventListener('click', (e) => { e.stopPropagation(); showMenuFor(e.currentTarget, enterpriseMenuParts, 'enterprise-chat-input'); });
+
+        // Hide menus helper
+        function hideAddMenus() {
+            [civilianMenuParts, enterpriseMenuParts].forEach(p => {
+                if (p && p.menu) p.menu.style.display = 'none';
+            });
+        }
+
+        // Clicking anywhere outside add-buttons or menus hides the menus
+        document.addEventListener('click', function() {
+            hideAddMenus();
+        });
 
         // File input handlers: when a file is selected, show a small preview and inject placeholder text
         document.getElementById('civilian-file-input').addEventListener('change', function(e) {
