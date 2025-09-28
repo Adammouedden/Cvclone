@@ -242,13 +242,34 @@
             padding-left: 16px;
         }
 
-        .about-image {
-            width: 50%; /* scale image to half its container width */
+        .about-images {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .about-images img.about-image {
+            width: 50%; /* each image fills half the left column */
             height: auto;
             border-radius: 8px;
             display: block;
             margin-bottom: 12px;
         }
+        /* Hurricanes folder UI */
+        .hurricane-list {
+            max-height: 70vh;
+            overflow: auto;
+            border: 1px solid #eee;
+            padding: 12px;
+            border-radius: 6px;
+            background: #fafafa;
+        }
+        .storm-item { margin-bottom: 8px; }
+        .storm-header { cursor: pointer; padding: 8px; background: #fff; border: 1px solid #e6e6e6; border-radius: 6px; }
+        .storm-timestamps { margin-top: 6px; margin-left: 8px; display: none; }
+        .storm-timestamps.active { display: block; }
+        .timestamp-item { padding: 6px 8px; cursor: pointer; border-radius: 4px; }
+        .timestamp-item:hover { background: #f0f8ff; }
     </style>
 </head>
 <body>
@@ -260,6 +281,7 @@
         <a class="nav-link" data-tab="civilian" onclick="openTab('civilian')">Civilian</a>
         <a class="nav-link" data-tab="enterprise" onclick="openTab('enterprise')">Enterprise</a>
         <a class="nav-link" data-tab="about" onclick="openTab('about')">About me</a>
+        <a class="nav-link" data-tab="hurricanes" onclick="openTab('hurricanes')">Hurricanes</a>
     </div>
 
     <div class="content-area">
@@ -301,7 +323,10 @@
             <h1>About me</h1>
             <div class="about-container">
                 <div class="about-left">
-                    <img src="./ultimateimage.png" alt="About image" class="about-image">
+                    <div class="about-images">
+                        <img src="./thegang.jpg" alt="Gang photo" class="about-image">
+                        <img src="./thegangfeelingsilly.jpg" alt="Silly gang" class="about-image">
+                    </div>
                     <p>Hello — this project, Cvclone, is an experimental interface combining mapping, live overlays, and chat assistants. It demonstrates multi-agent coordination, realtime overlays, and a simple frontend to prototype ideas. This page is a short bio area where you can describe the project goals, background, and contact info.</p>
                 </div>
                 <div class="about-right">
@@ -317,6 +342,15 @@
         <div id="resources-content" class="tab-content">
             <h2>Resources</h2>
             <p>This tab is currently blank.</p>
+        </div>
+
+        <!-- Hurricanes tab -->
+        <div id="hurricanes-content" class="tab-content">
+            <h2>Hurricanes</h2>
+            <p>Browse storms grouped by storm id. Expand a storm to see timestamps; click a timestamp to draw it on the map.</p>
+            <div id="hurricane-list" class="hurricane-list">
+                <p>Loading storms...</p>
+            </div>
         </div>
 
         <!-- Chat tab removed; chat is available inside Home as a collapsible panel -->
@@ -526,7 +560,7 @@
         
 
         // --- Chatbot Logic (Mock) for two separate chats ---
-        function sendChatMessage(inputId, windowId) {
+        async function sendChatMessage(inputId, windowId) {
             const input = document.getElementById(inputId);
             const messageText = input.value.trim();
             const chatWindow = document.getElementById(windowId);
@@ -539,15 +573,37 @@
             chatWindow.appendChild(userMessageDiv);
             input.value = '';
 
-            setTimeout(() => {
+            // Try calling backend API for civilian chat only
+            try {
+                // endpoint relative to where the frontend is hosted
+                // Use explicit backend address to avoid relative-origin issues when frontend
+                // is served from a different port. Adjust port if your server runs on another port.
+                const backendUrl = 'http://localhost:5001/api/chat/civilian';
+                const resp = await fetch(backendUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: messageText })
+                });
+                if (resp.ok) {
+                    const data = await resp.json();
+                    const botMessageDiv = document.createElement('div');
+                    botMessageDiv.className = 'message-bot';
+                    botMessageDiv.textContent = data.reply || 'No reply';
+                    chatWindow.appendChild(botMessageDiv);
+                } else {
+                    // fallback message if server returns an error
+                    const botMessageDiv = document.createElement('div');
+                    botMessageDiv.className = 'message-bot';
+                    botMessageDiv.textContent = `Server error: ${resp.status}`;
+                    chatWindow.appendChild(botMessageDiv);
+                }
+            } catch (err) {
+                // If the backend is not running or network fails, fall back to the local mock response
                 const botMessageDiv = document.createElement('div');
                 botMessageDiv.className = 'message-bot';
-                let response;
-                response = `I received: "${messageText}"`;
-                botMessageDiv.textContent = response;
+                botMessageDiv.textContent = `I received: "${messageText}"`;
                 chatWindow.appendChild(botMessageDiv);
-                chatWindow.scrollTop = chatWindow.scrollHeight;
-            }, 400);
+            }
 
             chatWindow.scrollTop = chatWindow.scrollHeight;
         }
@@ -654,6 +710,177 @@
     // wiring of locate button is done after DOMContentLoaded when elements exist
 
 
+    </script>
+
+    <script>
+    // --- Hurricanes CSV parsing and UI ---
+    const STORMS_CSV_PATH = './maps_spaghetti_classic/storms_near_florida.csv';
+    const SPAGHETTI_DIR = './maps_spaghetti_classic/';
+
+    // Hold drawn hurricane overlays so we can clear them
+    let hurricanePolylines = [];
+    let hurricaneMarkers = [];
+
+    // Simple CSV parser for the file format we have (sid,time_iso,time_ns,lat,lon)
+    function parseStormsCsv(text) {
+        const lines = text.trim().split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+        if (lines.length === 0) return {};
+        const header = lines[0].split(',');
+        const rows = lines.slice(1).map(line => {
+            const cols = line.split(',');
+            return {
+                sid: cols[0].replace(/^b'|\'$/g, ''),
+                time_iso: cols[1],
+                time_ns: cols[2],
+                lat: parseFloat(cols[3]),
+                lon: parseFloat(cols[4])
+            };
+        });
+        // Group by sid
+        const groups = {};
+        rows.forEach(r => {
+            if (!groups[r.sid]) groups[r.sid] = [];
+            groups[r.sid].push(r);
+        });
+        // Sort each storm's entries by time
+        Object.keys(groups).forEach(sid => groups[sid].sort((a,b) => a.time_iso.localeCompare(b.time_iso)));
+        return groups;
+    }
+
+    function clearHurricaneDrawings() {
+        hurricanePolylines.forEach(pl => pl.setMap && pl.setMap(null));
+        hurricaneMarkers.forEach(m => m.setMap && m.setMap(null));
+        hurricanePolylines = [];
+        hurricaneMarkers = [];
+        // If using Leaflet in spaghetti files, we won't reuse those; we're drawing on Google Maps here.
+    }
+
+    function drawStormTimestamp(sid, timeIso) {
+        // Find matching entries for that sid/time (there may be duplicates per timestamp)
+        fetch(STORMS_CSV_PATH).then(r => r.text()).then(text => {
+            const groups = parseStormsCsv(text);
+            const entries = (groups[sid] || []).filter(e => e.time_iso === timeIso);
+            if (entries.length === 0) {
+                // If exact timestamp not found, try to find the single entry with that time by trimming ms
+                alert('No entries found for that timestamp');
+                return;
+            }
+
+            clearHurricaneDrawings();
+
+            // Draw a polyline connecting all points for the storm (full track)
+            const allPoints = groups[sid].map(p => ({ lat: p.lat, lng: p.lon }));
+            const path = new google.maps.Polyline({
+                path: allPoints,
+                geodesic: true,
+                strokeColor: '#FF0000',
+                strokeOpacity: 0.8,
+                strokeWeight: 3,
+                map: map
+            });
+            hurricanePolylines.push(path);
+
+            // Place a marker for each entry in the selected timestamp (usually 1)
+            entries.forEach(ent => {
+                const marker = new google.maps.Marker({ position: { lat: ent.lat, lng: ent.lon }, map });
+                hurricaneMarkers.push(marker);
+
+                // Try to find an image for this storm (a spaghetti HTML exists per sid). We'll embed the spaghetti HTML via iframe if present.
+                const iframeSrc = SPAGHETTI_DIR + "b'" + sid + "'_spaghetti.html";
+                const infoContent = document.createElement('div');
+                infoContent.style.maxWidth = '320px';
+                const title = document.createElement('div');
+                title.textContent = `${sid} @ ${ent.time_iso}`;
+                title.style.fontWeight = '600';
+                title.style.marginBottom = '6px';
+                infoContent.appendChild(title);
+
+                // Add a small lat/lon line
+                const coordLine = document.createElement('div');
+                coordLine.textContent = `Lat: ${ent.lat.toFixed(4)}, Lng: ${ent.lon.toFixed(4)}`;
+                coordLine.style.fontSize = '12px';
+                coordLine.style.marginBottom = '6px';
+                infoContent.appendChild(coordLine);
+
+                // If the spaghetti HTML exists, embed it in an iframe (same-origin) else show a placeholder
+                fetch(iframeSrc, { method: 'HEAD' }).then(() => {
+                    const iframe = document.createElement('iframe');
+                    iframe.src = iframeSrc;
+                    iframe.width = '300';
+                    iframe.height = '200';
+                    iframe.style.border = '1px solid #ddd';
+                    infoContent.appendChild(iframe);
+                    const infowindow = new google.maps.InfoWindow({ content: infoContent });
+                    marker.addListener('click', () => infowindow.open(map, marker));
+                    // open immediately
+                    infowindow.open(map, marker);
+                }).catch(() => {
+                    // HEAD failed — show a simple placeholder image if you have any images in the folder
+                    const img = document.createElement('img');
+                    img.src = SPAGHETTI_DIR + 'spaghetti_combined.html'; // fallback: user can edit to a png if available
+                    img.alt = sid;
+                    img.style.width = '100%';
+                    img.style.height = 'auto';
+                    infoContent.appendChild(img);
+                    const infowindow = new google.maps.InfoWindow({ content: infoContent });
+                    marker.addListener('click', () => infowindow.open(map, marker));
+                    infowindow.open(map, marker);
+                });
+            });
+
+            // Pan map to the selected point
+            const first = entries[0];
+            if (first && map) {
+                map.panTo({ lat: first.lat, lng: first.lon });
+                map.setZoom(6);
+            }
+        });
+    }
+
+    function buildHurricaneList() {
+        const container = document.getElementById('hurricane-list');
+        fetch(STORMS_CSV_PATH).then(r => r.text()).then(text => {
+            const groups = parseStormsCsv(text);
+            container.innerHTML = '';
+            Object.keys(groups).sort().forEach(sid => {
+                const stormDiv = document.createElement('div');
+                stormDiv.className = 'storm-item';
+
+                const header = document.createElement('div');
+                header.className = 'storm-header';
+                header.textContent = sid + `  (${groups[sid].length} points)`;
+                stormDiv.appendChild(header);
+
+                const tsList = document.createElement('div');
+                tsList.className = 'storm-timestamps';
+                groups[sid].forEach(entry => {
+                    const ts = document.createElement('div');
+                    ts.className = 'timestamp-item';
+                    ts.textContent = entry.time_iso;
+                    ts.addEventListener('click', () => {
+                        // switch to home tab and draw
+                        openTab('home');
+                        drawStormTimestamp(sid, entry.time_iso);
+                    });
+                    tsList.appendChild(ts);
+                });
+
+                header.addEventListener('click', () => tsList.classList.toggle('active'));
+
+                stormDiv.appendChild(tsList);
+                container.appendChild(stormDiv);
+            });
+        }).catch(err => {
+            container.innerHTML = '<p>Could not load storms CSV.</p>';
+            console.error(err);
+        });
+    }
+
+    // Build hurricane list when user opens Hurricanes tab (or on load)
+    document.addEventListener('DOMContentLoaded', () => {
+        // Build immediately so it's ready in the tab
+        buildHurricaneList();
+    });
     </script>
 
     <script
