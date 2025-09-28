@@ -242,8 +242,14 @@
             padding-left: 16px;
         }
 
-        .about-image {
-            width: 50%; /* scale image to half its container width */
+        .about-images {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .about-images img.about-image {
+            width: 50%; /* each image fills half the left column */
             height: auto;
             border-radius: 8px;
             display: block;
@@ -317,7 +323,10 @@
             <h1>About me</h1>
             <div class="about-container">
                 <div class="about-left">
-                    <img src="./ultimateimage.png" alt="About image" class="about-image">
+                    <div class="about-images">
+                        <img src="./thegang.jpg" alt="Gang photo" class="about-image">
+                        <img src="./thegangfeelingsilly.jpg" alt="Silly gang" class="about-image">
+                    </div>
                     <p>Hello — this project, Cvclone, is an experimental interface combining mapping, live overlays, and chat assistants. It demonstrates multi-agent coordination, realtime overlays, and a simple frontend to prototype ideas. This page is a short bio area where you can describe the project goals, background, and contact info.</p>
                 </div>
                 <div class="about-right">
@@ -551,7 +560,7 @@
         
 
         // --- Chatbot Logic (Mock) for two separate chats ---
-        function sendChatMessage(inputId, windowId) {
+        async function sendChatMessage(inputId, windowId) {
             const input = document.getElementById(inputId);
             const messageText = input.value.trim();
             const chatWindow = document.getElementById(windowId);
@@ -564,15 +573,37 @@
             chatWindow.appendChild(userMessageDiv);
             input.value = '';
 
-            setTimeout(() => {
+            // Try calling backend API for civilian chat only
+            try {
+                // endpoint relative to where the frontend is hosted
+                // Use explicit backend address to avoid relative-origin issues when frontend
+                // is served from a different port. Adjust port if your server runs on another port.
+                const backendUrl = 'http://localhost:5001/api/chat/civilian';
+                const resp = await fetch(backendUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: messageText })
+                });
+                if (resp.ok) {
+                    const data = await resp.json();
+                    const botMessageDiv = document.createElement('div');
+                    botMessageDiv.className = 'message-bot';
+                    botMessageDiv.textContent = data.reply || 'No reply';
+                    chatWindow.appendChild(botMessageDiv);
+                } else {
+                    // fallback message if server returns an error
+                    const botMessageDiv = document.createElement('div');
+                    botMessageDiv.className = 'message-bot';
+                    botMessageDiv.textContent = `Server error: ${resp.status}`;
+                    chatWindow.appendChild(botMessageDiv);
+                }
+            } catch (err) {
+                // If the backend is not running or network fails, fall back to the local mock response
                 const botMessageDiv = document.createElement('div');
                 botMessageDiv.className = 'message-bot';
-                let response;
-                response = `I received: "${messageText}"`;
-                botMessageDiv.textContent = response;
+                botMessageDiv.textContent = `I received: "${messageText}"`;
                 chatWindow.appendChild(botMessageDiv);
-                chatWindow.scrollTop = chatWindow.scrollHeight;
-            }, 400);
+            }
 
             chatWindow.scrollTop = chatWindow.scrollHeight;
         }

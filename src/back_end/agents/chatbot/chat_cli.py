@@ -41,5 +41,24 @@ def chat(text: str)->str:
         print(f"Bot: {answer}\n")
         history.append(answer)
 
+
+def generate_reply(message: str, history=None) -> str:
+    """Generate a single reply for the supplied message.
+
+    This is a non-interactive helper intended for programmatic use by a web
+    server. It keeps the system prompt, appends the provided message and
+    returns the assistant text.
+    """
+    if history is None:
+        history = [system_prompt]
+    # Keep the history simple: system prompt + user message
+    history = list(history)
+    history.append(message)
+    resp = client.models.generate_content(
+        model=MODEL,
+        contents=history,
+    )
+    return resp.text
+
 if __name__ == "__main__":
     chat()
