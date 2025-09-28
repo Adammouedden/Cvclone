@@ -2,10 +2,7 @@
 import os
 from google import genai
 from google.genai import types
-from google.adk.agents import ParallelAgent, LlmAgent
-
 #Agent tools
-from news.news_tool import fetch_news
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -43,9 +40,6 @@ system_prompt = [""" You are an expert assistant specializing in risk analysis a
                         Maintain a calm, reassuring, professional tone suited for people under stress.
                     """
                 ]
-
-civilian_tool_box = ParallelAgent(name="CivillianAgent", sub_agents=[fetch_news],
-                    description="This agent runs these tools in parallel to quickly help civillians prepare for hurricanes")
 
 class Agent():
     def __init__(self, civilian=0):
