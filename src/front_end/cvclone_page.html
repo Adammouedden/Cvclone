@@ -280,8 +280,8 @@
         <a class="nav-link" data-tab="resources" onclick="openTab('resources')">Resources</a>
         <a class="nav-link" data-tab="civilian" onclick="openTab('civilian')">Civilian</a>
         <a class="nav-link" data-tab="enterprise" onclick="openTab('enterprise')">Enterprise</a>
-        <a class="nav-link" data-tab="about" onclick="openTab('about')">About me</a>
         <a class="nav-link" data-tab="hurricanes" onclick="openTab('hurricanes')">Hurricanes</a>
+        <a class="nav-link" data-tab="about" onclick="openTab('about')">About me</a>
     </div>
 
     <div class="content-area">
@@ -318,6 +318,15 @@
             </div>
         </div>
 
+        <!-- Hurricanes tab -->
+        <div id="hurricanes-content" class="tab-content">
+            <h2>Hurricanes</h2>
+            <p>Browse storms grouped by storm id. Expand a storm to see timestamps; click a timestamp to draw it on the map.</p>
+            <div id="hurricane-list" class="hurricane-list">
+                <p>Loading storms...</p>
+            </div>
+        </div>
+
         <!-- About Me tab -->
         <div id="about-content" class="tab-content">
             <h1>About me</h1>
@@ -343,18 +352,6 @@
             <h2>Resources</h2>
             <p>This tab is currently blank.</p>
         </div>
-
-        <!-- Hurricanes tab -->
-        <div id="hurricanes-content" class="tab-content">
-            <h2>Hurricanes</h2>
-            <p>Browse storms grouped by storm id. Expand a storm to see timestamps; click a timestamp to draw it on the map.</p>
-            <div id="hurricane-list" class="hurricane-list">
-                <p>Loading storms...</p>
-            </div>
-        </div>
-
-        <!-- Chat tab removed; chat is available inside Home as a collapsible panel -->
-
     </div>
 
     <script>
@@ -573,12 +570,11 @@
             chatWindow.appendChild(userMessageDiv);
             input.value = '';
 
-            // Try calling backend API for civilian chat only
+            // Choose backend endpoint based on which chat (civilian vs enterprise) invoked the function
+            const isCivilian = inputId.includes('civilian');
+            const backendUrl = isCivilian ? 'http://localhost:5001/api/chat/civilian' : 'http://localhost:5001/api/chat/enterprise';
+
             try {
-                // endpoint relative to where the frontend is hosted
-                // Use explicit backend address to avoid relative-origin issues when frontend
-                // is served from a different port. Adjust port if your server runs on another port.
-                const backendUrl = 'http://localhost:5001/api/chat/civilian';
                 const resp = await fetch(backendUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -591,14 +587,12 @@
                     botMessageDiv.textContent = data.reply || 'No reply';
                     chatWindow.appendChild(botMessageDiv);
                 } else {
-                    // fallback message if server returns an error
                     const botMessageDiv = document.createElement('div');
                     botMessageDiv.className = 'message-bot';
                     botMessageDiv.textContent = `Server error: ${resp.status}`;
                     chatWindow.appendChild(botMessageDiv);
                 }
             } catch (err) {
-                // If the backend is not running or network fails, fall back to the local mock response
                 const botMessageDiv = document.createElement('div');
                 botMessageDiv.className = 'message-bot';
                 botMessageDiv.textContent = `I received: "${messageText}"`;

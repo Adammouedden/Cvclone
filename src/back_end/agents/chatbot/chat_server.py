@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, make_response
 try:
     from flask_cors import CORS
 except Exception:
@@ -16,8 +16,23 @@ app = Flask(__name__)
 if CORS:
     CORS(app, resources={r"/api/*": {"origins": "*"}})
 
-@app.route('/api/chat/civilian', methods=['POST'])
+
+# If flask_cors is not installed, add a simple after_request hook and ensure
+# each route accepts OPTIONS so preflight requests succeed.
+@app.after_request
+def add_cors_headers(response):
+    # Allow any origin (development). Narrow this in production.
+    response.headers.setdefault('Access-Control-Allow-Origin', '*')
+    response.headers.setdefault('Access-Control-Allow-Methods', 'POST, OPTIONS')
+    response.headers.setdefault('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+    return response
+
+@app.route('/api/chat/civilian', methods=['POST', 'OPTIONS'])
 def civilian_chat():
+    # Respond to preflight requests immediately
+    if request.method == 'OPTIONS':
+        return make_response('', 200)
+
     data = request.get_json() or {}
     text = data.get('text', '')
     if not text:
@@ -29,8 +44,12 @@ def civilian_chat():
         return jsonify({'error': str(e)}), 500
     
 
-@app.route('/api/chat/enterprise', methods=['POST'])
+@app.route('/api/chat/enterprise', methods=['POST', 'OPTIONS'])
 def enterprise_chat():
+    # Respond to preflight requests immediately
+    if request.method == 'OPTIONS':
+        return make_response('', 200)
+
     data = request.get_json() or {}
     text = data.get('text', '')
     if not text:
