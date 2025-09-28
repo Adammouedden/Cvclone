@@ -131,6 +131,34 @@
             background-color: #2980b9;
         }
 
+        #civilian-send-btn {
+            padding: 10px 15px;
+            background-color: #9917bd;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        #enterprise-send-btn {
+            padding: 10px 15px;
+            background-color: #9917bd;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        #civilian-chat-input, #enterprise-chat-input {
+            flex-grow: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            margin-right: 10px;
+        }
+
         .message-user, .message-bot {
             margin-bottom: 10px;
             padding: 8px 12px;
@@ -150,33 +178,7 @@
             margin-right: auto;
         }
 
-        /* --- Collapsible Chat Panel inside Home --- */
-        .chat-panel {
-            position: absolute;
-            right: 20px;
-            bottom: 80px;
-            width: 320px;
-            max-height: 60vh;
-            display: flex;
-            flex-direction: column;
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            box-shadow: 0 6px 20px rgba(0,0,0,0.12);
-            overflow: hidden;
-            transform-origin: bottom right;
-            transition: transform 0.18s ease, opacity 0.18s ease;
-            transform: scale(0.95);
-            opacity: 0;
-            pointer-events: none;
-            z-index: 50;
-        }
-
-        .chat-panel[aria-hidden="false"] {
-            transform: scale(1);
-            opacity: 1;
-            pointer-events: auto;
-        }
+        /* Chat panels are now separate tabs (civilian & enterprise) */
 
         .toggle-chat-btn {
             position: absolute;
@@ -193,15 +195,71 @@
             font-size: 18px;    /* set text size */
             line-height: 1.2;
         }
+
+        .locate-me-btn {
+            position: fixed; /* fixed to viewport so it's always visible above the map */
+            right: 100px;
+            bottom: 25px;
+            z-index: 9999; /* ensure it sits on top of map layers */
+            padding: 10px 14px;
+            border-radius: 6px;
+            background-color: #2ecc71;
+            color: white;
+            border: none;
+            box-shadow: 0 4px 12px rgba(46,204,113,0.18);
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .coords-display {
+            position: absolute;
+            right: 20px;
+            bottom: 76px;
+            z-index: 65;
+            background: rgba(0,0,0,0.7);
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            display: none;
+        }
+
+        /* About page layout */
+        .about-container {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+
+        .about-left {
+            flex: 1 1 60%;
+        }
+
+        .about-right {
+            flex: 0 0 240px;
+            background: #fafafa;
+            border-left: 1px solid #eee;
+            padding-left: 16px;
+        }
+
+        .about-image {
+            width: 50%; /* scale image to half its container width */
+            height: auto;
+            border-radius: 8px;
+            display: block;
+            margin-bottom: 12px;
+        }
     </style>
 </head>
 <body>
 
-    <div class="sidebar">
+        <div class="sidebar">
         <div class="sidebar-title">Cvclone</div>
         <a class="nav-link active" data-tab="home" onclick="openTab('home')">Home</a>
         <a class="nav-link" data-tab="resources" onclick="openTab('resources')">Resources</a>
-        <!-- Chat is now a collapsible panel inside the Home tab -->
+        <a class="nav-link" data-tab="civilian" onclick="openTab('civilian')">Civilian</a>
+        <a class="nav-link" data-tab="enterprise" onclick="openTab('enterprise')">Enterprise</a>
+        <a class="nav-link" data-tab="about" onclick="openTab('about')">About me</a>
     </div>
 
     <div class="content-area">
@@ -209,19 +267,51 @@
         <div id="home-content" class="tab-content active">
             <div id="map"></div>
 
-            <!-- Collapsible Chat Panel (inside Home) -->
-            <div class="chat-panel" id="chat-panel" aria-hidden="true">
-                <div class="chat-window" id="chat-window">
-                    <div class="message-bot">Hello! I'm the Cvclone Chatbot. How can I help you?</div>
+            <!-- Locate button + coords display -->
+            <button id="locate-me-btn" class="locate-me-btn">Use my location</button>
+            <div id="coords-display" class="coords-display" aria-live="polite"></div>
+        </div>
+
+        <!-- Civilian chat tab -->
+        <div id="civilian-content" class="tab-content">
+            <h2>Civilian Chat</h2>
+            <div class="chat-window" id="civilian-chat-window">
+                <div class="message-bot">Civilian assistant ready.</div>
+            </div>
+            <div class="chat-input-container">
+                <input type="text" id="civilian-chat-input" placeholder="Ask the civilian assistant...">
+                <button id="civilian-send-btn">Send</button>
+            </div>
+        </div>
+
+        <!-- Enterprise chat tab -->
+        <div id="enterprise-content" class="tab-content">
+            <h2>Enterprise Chat</h2>
+            <div class="chat-window" id="enterprise-chat-window">
+                <div class="message-bot">Enterprise assistant online.</div>
+            </div>
+            <div class="chat-input-container">
+                <input type="text" id="enterprise-chat-input" placeholder="Ask the enterprise assistant...">
+                <button id="enterprise-send-btn">Send</button>
+            </div>
+        </div>
+
+        <!-- About Me tab -->
+        <div id="about-content" class="tab-content">
+            <h1>About me</h1>
+            <div class="about-container">
+                <div class="about-left">
+                    <img src="./ultimateimage.png" alt="About image" class="about-image">
+                    <p>Hello — this project, Cvclone, is an experimental interface combining mapping, live overlays, and chat assistants. It demonstrates multi-agent coordination, realtime overlays, and a simple frontend to prototype ideas. This page is a short bio area where you can describe the project goals, background, and contact info.</p>
                 </div>
-                <div class="chat-input-container">
-                    <input type="text" id="chat-input" placeholder="Type your message...">
-                    <button id="send-btn" onclick="sendMessage()">Send</button>
+                <div class="about-right">
+                    <h2>Credits</h2>
+                        <h4>Adam Mouedden</h4>
+                        <h4>David Orjuela</h4>
+                        <h4>Kenta Festag</h4>
+                        <h4>Sofia Flores</h4>    
                 </div>
             </div>
-
-            <!-- Toggle button to open/close chat -->
-            <button id="toggle-chat-btn" class="toggle-chat-btn" aria-expanded="false">Chat</button>
         </div>
 
         <div id="resources-content" class="tab-content">
@@ -237,6 +327,85 @@
         // --- Tab Switching Logic ---
         const tabContents = document.querySelectorAll('.tab-content');
         const navLinks = document.querySelectorAll('.nav-link');
+
+    // --- Overlay configuration (edit these values to change the image and its bounds) ---
+    // Change IMAGE_OVERLAY_URL to point to a different image file (relative to this HTML file)
+    const IMAGE_OVERLAY_URL = './ultimateimage.png';
+
+    // Two ways to configure overlay bounds:
+    // 1) Explicit bounds (recommended if you already know them):
+    //    { north: <lat>, south: <lat>, east: <lng>, west: <lng> }
+    // 2) Center + dimensions in meters (easier to edit). Set
+    //    IMAGE_OVERLAY_USE_CENTER = true and provide IMAGE_OVERLAY_CENTER + width/height.
+
+    // Use explicit bounds by default (edit these if you prefer direct control)
+    const IMAGE_OVERLAY_USE_CENTER = false; // set true to compute bounds from center + size
+    const IMAGE_OVERLAY_BOUNDS = { north: 28.5483, south: 28.5283, east: -81.3692, west: -81.3892 };
+
+    // Optional: when IMAGE_OVERLAY_USE_CENTER === true you can set these instead
+    const IMAGE_OVERLAY_CENTER = { lat: 28.5383, lng: -81.3792 }; // center point for overlay
+    const IMAGE_OVERLAY_WIDTH_METERS = 2000; // east-west width in meters
+    const IMAGE_OVERLAY_HEIGHT_METERS = 2000; // north-south height in meters
+
+    // --- Helper: validate bounds and compute from center+size when requested ---
+    function isFiniteNumber(n) {
+        return typeof n === 'number' && isFinite(n);
+    }
+
+    function validateBounds(bounds) {
+        if (!bounds || typeof bounds !== 'object') return false;
+        const { north, south, east, west } = bounds;
+        if (![north, south, east, west].every(isFiniteNumber)) return false;
+        // basic ordering checks
+        if (!(north > south)) return false;
+        // east/west can wrap the antimeridian in some cases; here we expect east > west for simplicity
+        if (!(east > west)) return false;
+        // lat range clamp
+        if (north > 90 || south < -90) return false;
+        if (east > 180 || west < -180) return false;
+        return true;
+    }
+
+    // Approximate conversion from meters to degrees at a given latitude.
+    // Uses mean earth radius approximation: 1 deg latitude ~= 111,320 meters.
+    function metersToDegreesLat(meters) {
+        return meters / 111320;
+    }
+
+    function metersToDegreesLng(meters, atLat) {
+        // Longitude degrees scale with cos(latitude)
+        const latRad = (atLat * Math.PI) / 180;
+        const metersPerDeg = 111320 * Math.cos(latRad);
+        // avoid divide-by-zero near poles
+        return metersPerDeg === 0 ? 0 : meters / metersPerDeg;
+    }
+
+    function computeBoundsFromCenter(center, widthMeters, heightMeters) {
+        if (!center || !isFiniteNumber(center.lat) || !isFiniteNumber(center.lng)) return null;
+        const halfHeightDeg = metersToDegreesLat(heightMeters / 2);
+        const halfWidthDeg = metersToDegreesLng(widthMeters / 2, center.lat);
+        return {
+            north: center.lat + halfHeightDeg,
+            south: center.lat - halfHeightDeg,
+            east: center.lng + halfWidthDeg,
+            west: center.lng - halfWidthDeg
+        };
+    }
+
+    function getOverlayBounds() {
+        if (IMAGE_OVERLAY_USE_CENTER) {
+            const b = computeBoundsFromCenter(IMAGE_OVERLAY_CENTER, IMAGE_OVERLAY_WIDTH_METERS, IMAGE_OVERLAY_HEIGHT_METERS);
+            if (b && validateBounds(b)) return b;
+            console.warn('Computed bounds from center are invalid, falling back to IMAGE_OVERLAY_BOUNDS if valid.');
+        }
+        if (validateBounds(IMAGE_OVERLAY_BOUNDS)) return IMAGE_OVERLAY_BOUNDS;
+        // Last-resort: attempt to compute from center values if available
+        const fallback = computeBoundsFromCenter(IMAGE_OVERLAY_CENTER, IMAGE_OVERLAY_WIDTH_METERS, IMAGE_OVERLAY_HEIGHT_METERS);
+        if (fallback && validateBounds(fallback)) return fallback;
+        // If nothing valid, return a very small default around center or zero-area box to avoid exceptions
+        console.warn('No valid overlay bounds available — using tiny fallback box at (0,0).');
+        return { north: 0.0001, south: -0.0001, east: 0.0001, west: -0.0001 };
+    }
 
         function openTab(tabName) {
             // Deactivate all tab contents and navigation links
@@ -260,7 +429,24 @@
             // If switching to the 'home' tab, ensure the map initializes/resizes
             if (tabName === 'home') {
                 // This calls the map initialization function defined later
-                setTimeout(() => initMap(), 100); 
+                setTimeout(() => {
+                    initMap();
+                    // try to request user location when entering home (only once)
+                    requestUserLocation().catch(() => {});
+                }, 100);
+            }
+            // Focus chat inputs when opening their tabs and scroll to bottom
+            if (tabName === 'civilian') {
+                const input = document.getElementById('civilian-chat-input');
+                const win = document.getElementById('civilian-chat-window');
+                if (input) input.focus();
+                if (win) win.scrollTop = win.scrollHeight;
+            }
+            if (tabName === 'enterprise') {
+                const input = document.getElementById('enterprise-chat-input');
+                const win = document.getElementById('enterprise-chat-window');
+                if (input) input.focus();
+                if (win) win.scrollTop = win.scrollHeight;
             }
         }
 
@@ -269,6 +455,9 @@
         let imageOverlay = null; // Variable to hold the GroundOverlay object
 
         function initMap() {
+            // Only run if Google Maps API is loaded
+            if (typeof google === 'undefined' || !google.maps) return;
+
             // Check if the map div exists and is visible
             const mapDiv = document.getElementById('map');
             if (!mapDiv) return;
@@ -276,7 +465,8 @@
             // Only create the map if it hasn't been created yet
             if (!map) {
                 // Default location: Central Florida (using your existing values)
-                const initialPos = { lat: 28.5383, lng: -81.3792 };
+                //{ lat: 25.758925, lng: -80.376627}
+                const initialPos = { lat: 30.758925, lng: -80.376627};
 
                 map = new google.maps.Map(mapDiv, {
                     center: initialPos,
@@ -284,27 +474,15 @@
                     mapId: 'DEMO_MAP_ID', // Recommended for custom styling
                 });
 
-                // Example: Add a marker for the initial position
-                new google.maps.Marker({
-                    position: initialPos,
-                    map,
-                    title: "Project Location Area",
-                });
+                // No default marker is placed here so the map starts clean.
 
                 // ⭐ NEW: Load the image overlay immediately after map initialization
                 // Mock coordinates for the image overlay (e.g., covering a 1-mile square)
-                const imageBounds = {
-                    north: 28.5483, // Slightly north of center
-                    south: 28.5283, // Slightly south
-                    east: -81.3692,  // Slightly east
-                    west: -81.3892,  // Slightly west
-                };
-                
-                // Mock image URL (In a real system, this would be your API endpoint)
-                const imageUrl = './ultimateimage.png'; // Mock image for illustration (e.g., a security camera icon)
+                // Use configured overlay values (change at top of file)
+                placeImageOverlay(IMAGE_OVERLAY_URL, getOverlayBounds());
 
-                // Call the function to place the image overlay
-                placeImageOverlay(imageUrl, imageBounds);
+                // After the map has been initialized, try requesting user location once
+                requestUserLocation().catch(() => {});
 
             } else {
                 // For existing map, this might trigger a resize if needed
@@ -342,66 +520,55 @@
         // You would typically use a function like this to dynamically update the image URL:
         
         function updateCameraFeedOverlay() {
-            // 1. Use a local image file (place ultimateimage.png in the same folder as this HTML file)
-            const latestImageUrl = './ultimateimage.png';
-            
-            // 2. Define the bounds where the Pi camera is located (must be hardcoded or fetched dynamically)
-            const cameraBounds = { north: 28.5483, south: 28.5283, east: -81.3692, west: -81.3892 };
-            
-            placeImageOverlay(latestImageUrl, cameraBounds);
+            // Use configured overlay values (change IMAGE_OVERLAY_URL and IMAGE_OVERLAY_BOUNDS above)
+            placeImageOverlay(IMAGE_OVERLAY_URL, getOverlayBounds());
         }
         
 
-        // --- Chatbot Logic (Mock) ---
-        function sendMessage() {
-            const input = document.getElementById('chat-input');
+        // --- Chatbot Logic (Mock) for two separate chats ---
+        function sendChatMessage(inputId, windowId) {
+            const input = document.getElementById(inputId);
             const messageText = input.value.trim();
-            const chatWindow = document.getElementById('chat-window');
+            const chatWindow = document.getElementById(windowId);
 
             if (messageText === "") return;
 
-            // 1. Display user message
             const userMessageDiv = document.createElement('div');
             userMessageDiv.className = 'message-user';
             userMessageDiv.textContent = messageText;
             chatWindow.appendChild(userMessageDiv);
-
-            // Clear input
             input.value = '';
 
-            // 2. Mock bot response (after a short delay)
             setTimeout(() => {
                 const botMessageDiv = document.createElement('div');
                 botMessageDiv.className = 'message-bot';
-
                 let response;
-                
-                response = `I received your message: "${messageText}". That's interesting!`;
-                
+                response = `I received: "${messageText}"`;
                 botMessageDiv.textContent = response;
                 chatWindow.appendChild(botMessageDiv);
-
-                // 3. Scroll to the bottom of the chat window
                 chatWindow.scrollTop = chatWindow.scrollHeight;
+            }, 400);
 
-            }, 500); // 0.5 second delay
-
-            // Scroll to the bottom immediately after user sends a message
             chatWindow.scrollTop = chatWindow.scrollHeight;
-
         }
 
-        // Allow sending message with Enter key
-        document.getElementById('chat-input').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                sendMessage();
-            }
-        });
+        // Wire civilian chat
+        document.getElementById('civilian-send-btn').addEventListener('click', () => sendChatMessage('civilian-chat-input', 'civilian-chat-window'));
+        document.getElementById('civilian-chat-input').addEventListener('keypress', function(e) { if (e.key === 'Enter') sendChatMessage('civilian-chat-input', 'civilian-chat-window'); });
+
+        // Wire enterprise chat
+        document.getElementById('enterprise-send-btn').addEventListener('click', () => sendChatMessage('enterprise-chat-input', 'enterprise-chat-window'));
+        document.getElementById('enterprise-chat-input').addEventListener('keypress', function(e) { if (e.key === 'Enter') sendChatMessage('enterprise-chat-input', 'enterprise-chat-window'); });
 
         // --- Initialization ---
         document.addEventListener('DOMContentLoaded', () => {
-            // Initialize the map once the DOM is ready and the 'home' tab is active
-            initMap();
+            // wire locate button and coords display now that elements exist
+            locateMeBtn = document.getElementById('locate-me-btn');
+            coordsDisplay = document.getElementById('coords-display');
+            if (locateMeBtn) locateMeBtn.addEventListener('click', () => requestUserLocation(true).catch(() => {}));
+
+            // Attempt to request user location on initial load (will only prompt once)
+            requestUserLocation().catch(() => {});
 
             // Add event listener for dynamic resizing (good practice)
             window.addEventListener('resize', () => {
@@ -412,43 +579,80 @@
         });
 
         // --- Chat Panel Toggle Logic ---
-        const chatPanel = document.getElementById('chat-panel');
-        const toggleChatBtn = document.getElementById('toggle-chat-btn');
+        // Chat panel/toggle removed; chats live in separate tabs
 
-        function openChat() {
-            chatPanel.setAttribute('aria-hidden', 'false');
-            toggleChatBtn.setAttribute('aria-expanded', 'true');
-            // focus input when opened
-            const input = document.getElementById('chat-input');
-            if (input) input.focus();
+    // --- Geolocation (Use my location) ---
+    let locateMeBtn = null;
+    let coordsDisplay = null;
+        let userLocationMarker = null;
+        let userLocationRequested = false; // guard to avoid repeated prompts
+
+        function showCoords(lat, lng) {
+            coordsDisplay.textContent = `Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`;
+            coordsDisplay.style.display = 'block';
+            setTimeout(() => { coordsDisplay.style.display = 'none'; }, 6000);
         }
 
-        function closeChat() {
-            chatPanel.setAttribute('aria-hidden', 'true');
-            toggleChatBtn.setAttribute('aria-expanded', 'false');
-            toggleChatBtn.focus();
+        function requestUserLocation(force = false) {
+            if (!navigator.geolocation) {
+                console.warn('Geolocation is not supported by this browser.');
+                return Promise.reject(new Error('Geolocation not supported'));
+            }
+
+            if (userLocationRequested && !force) {
+                return Promise.resolve(null); // already asked once
+            }
+
+            userLocationRequested = true;
+
+            // Optional UI feedback if button exists
+            if (locateMeBtn) {
+                locateMeBtn.disabled = true;
+                locateMeBtn.textContent = 'Locating...';
+            }
+
+            return new Promise((resolve, reject) => {
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                        const lat = pos.coords.latitude;
+                        const lng = pos.coords.longitude;
+
+                        // Place or update marker only if the map is ready
+                        if (typeof google !== 'undefined' && google.maps && typeof map !== 'undefined' && map) {
+                            try {
+                                if (userLocationMarker) userLocationMarker.setMap(null);
+                                userLocationMarker = new google.maps.Marker({ position: { lat, lng }, map });
+                                map.panTo({ lat, lng });
+                                map.setZoom(15);
+                            } catch (e) {
+                                console.warn('Could not place marker (map not ready):', e);
+                            }
+                        }
+
+                        showCoords(lat, lng);
+
+                        if (locateMeBtn) {
+                            locateMeBtn.disabled = false;
+                            locateMeBtn.textContent = 'Use my location';
+                        }
+
+                        resolve({ lat, lng });
+                    },
+                    (err) => {
+                        if (locateMeBtn) {
+                            locateMeBtn.disabled = false;
+                            locateMeBtn.textContent = 'Use my location';
+                        }
+                        console.warn('Geolocation error', err);
+                        reject(err);
+                    },
+                    { enableHighAccuracy: true, timeout: 10000 }
+                );
+            });
         }
 
-        toggleChatBtn.addEventListener('click', (e) => {
-            const isOpen = chatPanel.getAttribute('aria-hidden') === 'false';
-            if (isOpen) closeChat(); else openChat();
-        });
+    // wiring of locate button is done after DOMContentLoaded when elements exist
 
-        // Close chat when clicking outside
-        document.addEventListener('click', (e) => {
-            if (!chatPanel || !toggleChatBtn) return;
-            const isClickInside = chatPanel.contains(e.target) || toggleChatBtn.contains(e.target);
-            if (!isClickInside && chatPanel.getAttribute('aria-hidden') === 'false') {
-                closeChat();
-            }
-        });
-
-        // Close chat with Escape
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && chatPanel.getAttribute('aria-hidden') === 'false') {
-                closeChat();
-            }
-        });
 
     </script>
 
