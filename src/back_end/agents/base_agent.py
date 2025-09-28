@@ -82,6 +82,13 @@ class Agent():
         )
         return response.text
     
-    def civilian_agent(self):
-        pass
+    def cache_augmented_generation(self, content: list):
+        self.history.append(content)
+        response = self.client.models.generate_content(
+            model=MODEL,
+            contents=str(content)
+        )
+        self.history.append(response.text)
+        return response.text
+
         

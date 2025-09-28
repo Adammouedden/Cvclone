@@ -10,11 +10,13 @@ from werkzeug.utils import secure_filename
 # Import the helper from chat_cli
 from agents.base_agent import Agent
 
+
 app = Flask(__name__)
 # Enable CORS if flask_cors is available. This allows the frontend (served on another port)
 # to send POST requests and the browser preflight (OPTIONS) to succeed.
 if CORS:
     CORS(app, resources={r"/api/*": {"origins": "*"}})
+
 
 civilian_agent = Agent(civilian=1)
 enterprise_agent = Agent(civilian=0)
