@@ -328,6 +328,85 @@
         const tabContents = document.querySelectorAll('.tab-content');
         const navLinks = document.querySelectorAll('.nav-link');
 
+    // --- Overlay configuration (edit these values to change the image and its bounds) ---
+    // Change IMAGE_OVERLAY_URL to point to a different image file (relative to this HTML file)
+    const IMAGE_OVERLAY_URL = './ultimateimage.png';
+
+    // Two ways to configure overlay bounds:
+    // 1) Explicit bounds (recommended if you already know them):
+    //    { north: <lat>, south: <lat>, east: <lng>, west: <lng> }
+    // 2) Center + dimensions in meters (easier to edit). Set
+    //    IMAGE_OVERLAY_USE_CENTER = true and provide IMAGE_OVERLAY_CENTER + width/height.
+
+    // Use explicit bounds by default (edit these if you prefer direct control)
+    const IMAGE_OVERLAY_USE_CENTER = false; // set true to compute bounds from center + size
+    const IMAGE_OVERLAY_BOUNDS = { north: 28.5483, south: 28.5283, east: -81.3692, west: -81.3892 };
+
+    // Optional: when IMAGE_OVERLAY_USE_CENTER === true you can set these instead
+    const IMAGE_OVERLAY_CENTER = { lat: 28.5383, lng: -81.3792 }; // center point for overlay
+    const IMAGE_OVERLAY_WIDTH_METERS = 2000; // east-west width in meters
+    const IMAGE_OVERLAY_HEIGHT_METERS = 2000; // north-south height in meters
+
+    // --- Helper: validate bounds and compute from center+size when requested ---
+    function isFiniteNumber(n) {
+        return typeof n === 'number' && isFinite(n);
+    }
+
+    function validateBounds(bounds) {
+        if (!bounds || typeof bounds !== 'object') return false;
+        const { north, south, east, west } = bounds;
+        if (![north, south, east, west].every(isFiniteNumber)) return false;
+        // basic ordering checks
+        if (!(north > south)) return false;
+        // east/west can wrap the antimeridian in some cases; here we expect east > west for simplicity
+        if (!(east > west)) return false;
+        // lat range clamp
+        if (north > 90 || south < -90) return false;
+        if (east > 180 || west < -180) return false;
+        return true;
+    }
+
+    // Approximate conversion from meters to degrees at a given latitude.
+    // Uses mean earth radius approximation: 1 deg latitude ~= 111,320 meters.
+    function metersToDegreesLat(meters) {
+        return meters / 111320;
+    }
+
+    function metersToDegreesLng(meters, atLat) {
+        // Longitude degrees scale with cos(latitude)
+        const latRad = (atLat * Math.PI) / 180;
+        const metersPerDeg = 111320 * Math.cos(latRad);
+        // avoid divide-by-zero near poles
+        return metersPerDeg === 0 ? 0 : meters / metersPerDeg;
+    }
+
+    function computeBoundsFromCenter(center, widthMeters, heightMeters) {
+        if (!center || !isFiniteNumber(center.lat) || !isFiniteNumber(center.lng)) return null;
+        const halfHeightDeg = metersToDegreesLat(heightMeters / 2);
+        const halfWidthDeg = metersToDegreesLng(widthMeters / 2, center.lat);
+        return {
+            north: center.lat + halfHeightDeg,
+            south: center.lat - halfHeightDeg,
+            east: center.lng + halfWidthDeg,
+            west: center.lng - halfWidthDeg
+        };
+    }
+
+    function getOverlayBounds() {
+        if (IMAGE_OVERLAY_USE_CENTER) {
+            const b = computeBoundsFromCenter(IMAGE_OVERLAY_CENTER, IMAGE_OVERLAY_WIDTH_METERS, IMAGE_OVERLAY_HEIGHT_METERS);
+            if (b && validateBounds(b)) return b;
+            console.warn('Computed bounds from center are invalid, falling back to IMAGE_OVERLAY_BOUNDS if valid.');
+        }
+        if (validateBounds(IMAGE_OVERLAY_BOUNDS)) return IMAGE_OVERLAY_BOUNDS;
+        // Last-resort: attempt to compute from center values if available
+        const fallback = computeBoundsFromCenter(IMAGE_OVERLAY_CENTER, IMAGE_OVERLAY_WIDTH_METERS, IMAGE_OVERLAY_HEIGHT_METERS);
+        if (fallback && validateBounds(fallback)) return fallback;
+        // If nothing valid, return a very small default around center or zero-area box to avoid exceptions
+        console.warn('No valid overlay bounds available — using tiny fallback box at (0,0).');
+        return { north: 0.0001, south: -0.0001, east: 0.0001, west: -0.0001 };
+    }
+
         function openTab(tabName) {
             // Deactivate all tab contents and navigation links
             console.log("(1)Switching a tab:");
@@ -399,18 +478,8 @@
 
                 // ⭐ NEW: Load the image overlay immediately after map initialization
                 // Mock coordinates for the image overlay (e.g., covering a 1-mile square)
-                const imageBounds = {
-                    north: 28.5483, // Slightly north of center
-                    south: 28.5283, // Slightly south
-                    east: -81.3692,  // Slightly east
-                    west: -81.3892,  // Slightly west
-                };
-                
-                // Mock image URL (In a real system, this would be your API endpoint)
-                const imageUrl = './ultimateimage.png'; // Mock image for illustration (e.g., a security camera icon)
-
-                // Call the function to place the image overlay
-                placeImageOverlay(imageUrl, imageBounds);
+                // Use configured overlay values (change at top of file)
+                placeImageOverlay(IMAGE_OVERLAY_URL, getOverlayBounds());
 
                 // After the map has been initialized, try requesting user location once
                 requestUserLocation().catch(() => {});
@@ -451,13 +520,8 @@
         // You would typically use a function like this to dynamically update the image URL:
         
         function updateCameraFeedOverlay() {
-            // 1. Use a local image file (place ultimateimage.png in the same folder as this HTML file)
-            const latestImageUrl = './ultimateimage.png';
-            
-            // 2. Define the bounds where the Pi camera is located (must be hardcoded or fetched dynamically)
-            const cameraBounds = { north: 28.5483, south: 28.5283, east: -81.3692, west: -81.3892 };
-            
-            placeImageOverlay(latestImageUrl, cameraBounds);
+            // Use configured overlay values (change IMAGE_OVERLAY_URL and IMAGE_OVERLAY_BOUNDS above)
+            placeImageOverlay(IMAGE_OVERLAY_URL, getOverlayBounds());
         }
         
 
@@ -479,13 +543,7 @@
                 const botMessageDiv = document.createElement('div');
                 botMessageDiv.className = 'message-bot';
                 let response;
-                if (messageText.toLowerCase().includes('cerberus')) {
-                    response = 'Cerberus is the multi-agent system — nice!';
-                } else if (messageText.toLowerCase().includes('langgraph')) {
-                    response = 'LangGraph is great for workflows.';
-                } else {
-                    response = `I received: "${messageText}"`;
-                }
+                response = `I received: "${messageText}"`;
                 botMessageDiv.textContent = response;
                 chatWindow.appendChild(botMessageDiv);
                 chatWindow.scrollTop = chatWindow.scrollHeight;
