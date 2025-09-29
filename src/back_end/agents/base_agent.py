@@ -4,8 +4,39 @@ from google import genai
 from google.genai import types
 #Agent tools
 
+#from .forecast.agent import get_snapshot
+#from .store_routing.agent import plan_routes
+
 from dotenv import load_dotenv
 load_dotenv()
+
+sample_latitude = 25.758925
+sample_longitude = -80.376627
+#forecast = get_snapshot(sample_latitude, sample_longitude)
+
+sample_user_location = {"lat": 25.772, "lon": -80.196}  # Miami, FL 
+items = [
+  {"name": "Water (liters)", "qty": 24},
+  {"name": "Shelf-stable food (calories)", "qty": 6000},
+  {"name": "Batteries AA/AAA (count)", "qty": 16},
+  {"name": "Tarps / duct tape", "qty": 2},
+  {"name": "Plywood panels", "qty": 8},
+  {"name": "Sandbags", "qty": 20},
+  {"name": "Prescription meds (days)", "qty": 7},
+  {"name": "Ice / cooler", "qty": 1},
+  {"name": "Infant formula (servings)", "qty": 20},
+  {"name": "Diapers (count)", "qty": 40},
+  {"name": "Wipes (packs)", "qty": 3}
+]
+max_radius_km = 12.0
+closures = [
+  "Home Depot Midtown reports limited access",
+  "Lowe's experiencing partial power outage"
+]
+
+#planned_routes = plan_routes(sample_user_location, items, max_radius_km, closures)
+
+
 
 API_KEY = os.getenv("GEMINI_API")  # set this in your shell first
 MODEL = "gemini-2.5-flash"
@@ -23,7 +54,13 @@ system_prompt = [""" You are an expert assistant specializing in risk analysis a
                     - Maintain a calm, reassuring, and professional tone.
 
                     Your only output should be plain English text intended for people under potential stress,
-                    not JSON, code, or technical dumps.""",
+                    not JSON, code, or technical dumps.
+
+                    If you ever recieve an image as input, you must inform users how they can specifically protect their house. 
+                    Identify structural weaknesses, suggest reinforcements, and recommend safety measures based on the image provided. 
+                    But respond to the image in 2-4 sentences only, in HTML without any other text.
+
+                    """,
 
                     """
                     You are a trusted advisor helping businesses stay safe, minimize losses, and remain profitable before, during, and after hurricanes.
@@ -38,7 +75,12 @@ system_prompt = [""" You are an expert assistant specializing in risk analysis a
                         Keep advice concise but helpful: 2–4 sentences unless more detail is requested.
 
                         Maintain a calm, reassuring, professional tone suited for people under stress.
-                    """
+                    If you ever recieve an image as input, you must inform users how they can specifically protect their house. 
+                    Identify structural weaknesses, suggest reinforcements, and recommend safety measures based on the image provided. 
+                    But respond to the image in 2-4 sentences only, in MARKDOWN without any other text.
+                 
+                    
+                      """
                 ]
 
 class Agent():
@@ -50,6 +92,9 @@ class Agent():
             self.history.append(system_prompt[0])
         else:
             self.history.append(system_prompt[1])
+
+        #self.history.append(f"The current weather forecast for your area is: {forecast}.")
+        #self.history.append(f"Here are some nearby stores and routes that can help you get supplies: {planned_routes}.")        
 
     def generate_reply(self, message: str) -> str:
         """Generate a single reply for the supplied message.
@@ -69,10 +114,13 @@ class Agent():
         self.history.append(resp.text)
         return resp.text
     
+    
+    
     def respond_to_image(self, image_bytes):
         response = self.client.models.generate_content(
             model=MODEL,
-            contents=[types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"), "Describe how the user can better protect their home from storms"], 
+            contents=[types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
+                      "Tell the user how to protect their home from hurricanes based on the image."], 
         )
         return response.text
     

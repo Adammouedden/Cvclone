@@ -1,1018 +1,870 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cvclone</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            display: flex;
-            height: 100vh;
-            overflow: hidden; /* Prevent body scroll */
-            background-color: #f4f4f9;
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Cvclone</title>
 
-        /* --- Sidebar/Navigation --- */
-        .sidebar {
-            width: 200px;
-            flex: 0 0 200px; /* keep the sidebar a fixed-width flex item so tab content can't resize it */
-            background-color: #2c3e50; /* Dark sidebar */
-            color: white;
-            display: flex;
-            flex-direction: column;
-            padding: 15px 0;
-            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
-        }
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+      background-color: #f4f4f9;
+    }
 
-        .sidebar-title {
-            text-align: center;
-            font-size: 1.5em;
-            font-weight: bold;
-            margin-bottom: 20px;
-            padding: 0 10px;
-            color: #ecf0f1;
-        }
+    /* --- Sidebar/Navigation --- */
+    .sidebar {
+      width: 200px;
+      flex: 0 0 200px;
+      background-color: #2c3e50;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      padding: 15px 0;
+      box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+    }
+    .sidebar-title {
+      text-align: center;
+      font-size: 1.5em;
+      font-weight: bold;
+      margin-bottom: 20px;
+      padding: 0 10px;
+      color: #ecf0f1;
+    }
+    .nav-link {
+      padding: 15px 20px;
+      cursor: pointer;
+      text-decoration: none;
+      color: #bdc3c7;
+      border-left: 5px solid transparent;
+      transition: all 0.3s ease;
+    }
+    .nav-link:hover { background-color: #34495e; }
+    .nav-link.active {
+      background-color: #34495e;
+      color: white;
+      border-left-color: #3498db;
+    }
 
-        .nav-link {
-            padding: 15px 20px;
-            cursor: pointer;
-            text-decoration: none;
-            color: #bdc3c7;
-            border-left: 5px solid transparent;
-            transition: all 0.3s ease;
-        }
+    /* --- Main Content Area --- */
+    .content-area {
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      background-color: white;
+      min-width: 0;
+    }
 
-        .nav-link:hover {
-            background-color: #34495e;
-        }
+    /* --- Tab Content --- */
+    .tab-content {
+      flex-grow: 1;
+      padding: 20px;
+      overflow-y: auto;
+      display: none;
+    }
+    .tab-content.active { display: block; }
 
-        .nav-link.active {
-            background-color: #34495e;
-            color: white;
-            border-left-color: #3498db; /* Highlight active tab */
-        }
+    /* --- Home Tab (Map) --- */
+    #map { height: 100%; width: 100%; min-height: 400px; }
+    #home-content { height: 100%; padding: 0; }
 
-        /* --- Main Content Area --- */
-        .content-area {
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            background-color: white;
-            min-width: 0; /* allow the content area to shrink inside the flex row without forcing the sidebar to change */
-        }
+    /* --- Chat Tabs --- */
+    #chat-content { display: flex; flex-direction: column; height: 100%; padding: 0; }
+    .chat-window {
+      flex-grow: 1;
+      overflow-y: auto;
+      padding: 15px;
+      border: 1px solid #ddd;
+      background-color: #f9f9f9;
+      margin-bottom: 10px;
+      border-radius: 5px;
+    }
+    .chat-input-container {
+      display: flex;
+      gap: 10px;
+      padding: 10px;
+      border-top: 1px solid #eee;
+    }
+    #civilian-chat-input, #enterprise-chat-input {
+      flex-grow: 1;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    #civilian-send-btn, #enterprise-send-btn {
+      padding: 10px 15px;
+      background-color: #1ed3d6;
+      color: black;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    #civilian-send-btn:hover, #enterprise-send-btn:hover { background-color: #7db7dd; }
+    .add-btn {
+      padding: 8px 10px;
+      background: #2ecc71;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
 
-        /* --- Tab Content --- */
-        .tab-content {
-            flex-grow: 1;
-            padding: 20px;
-            overflow-y: auto; /* Allow content scroll if needed */
-            display: none;
-        }
+    .message-user, .message-bot {
+      margin-bottom: 10px;
+      padding: 8px 12px;
+      border-radius: 15px;
+      max-width: 70%;
+      word-wrap: break-word;
+      overflow-wrap: anywhere;
+    }
+    .message-user {
+      background-color: #d1e7dd;
+      align-self: flex-end;
+      margin-left: auto;
+    }
+    .message-bot {
+      background-color: #f0f0f0;
+      align-self: flex-start;
+      margin-right: auto;
+    }
+    /* Make code blocks inside bot messages look nice */
+    .message-bot pre {
+      margin: 8px 0;
+      padding: 8px;
+      border-radius: 6px;
+      background: #fff;
+      border: 1px solid #e6e6e6;
+      overflow: auto;
+      max-width: 100%;
+    }
+    .message-bot code { font-family: Consolas, Monaco, 'Courier New', monospace; }
 
-        .tab-content.active {
-            display: block;
-        }
+    .toggle-chat-btn {
+      position: absolute;
+      right: 60px;
+      bottom: 20px;
+      z-index: 60;
+      padding: 14px 18px;
+      border-radius: 999px;
+      background-color: #9917bd;
+      color: white;
+      border: none;
+      box-shadow: 0 6px 16px rgba(52,152,219,0.28);
+      cursor: pointer;
+      font-size: 18px;
+      line-height: 1.2;
+    }
 
-        /* --- Home Tab (Map) --- */
-        #map {
-            height: 100%;
-            width: 100%;
-            min-height: 400px; /* Ensure map has space */
-        }
+    .locate-me-btn {
+      position: fixed;
+      right: 100px;
+      bottom: 25px;
+      z-index: 9999;
+      padding: 10px 14px;
+      border-radius: 6px;
+      background-color: #2ecc71;
+      color: white;
+      border: none;
+      box-shadow: 0 4px 12px rgba(46,204,113,0.18);
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .coords-display {
+      position: absolute;
+      right: 20px;
+      bottom: 76px;
+      z-index: 65;
+      background: rgba(0,0,0,0.7);
+      color: #fff;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      display: none;
+    }
 
-        #home-content {
-            height: 100%; /* Important for map to fill space */
-            padding: 0;
-        }
+    /* About */
+    .about-container { display: flex; gap: 20px; align-items: flex-start; }
+    .about-left { flex: 1 1 60%; }
+    .about-right {
+      flex: 0 0 240px;
+      background: #fafafa;
+      border-left: 1px solid #eee;
+      padding-left: 16px;
+    }
+    .about-images {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+    .about-images img.about-image {
+      flex: 1 1 45%;
+      max-width: 45%;
+      width: 100%;
+      height: auto;
+      border-radius: 8px;
+      display: block;
+      margin-bottom: 12px;
+      object-fit: cover;
+    }
 
-        /* --- Chat Tab (Chatbot UI) --- */
-        #chat-content {
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-            padding: 0;
-        }
+    /* Hurricanes folder UI */
+    .hurricane-list { max-height: 70vh; overflow: auto; border: 1px solid #eee; padding: 12px; border-radius: 6px; background: #fafafa; }
+    .storm-item { margin-bottom: 8px; }
+    .storm-header { cursor: pointer; padding: 8px; background: #fff; border: 1px solid #e6e6e6; border-radius: 6px; }
+    .storm-timestamps { margin-top: 6px; margin-left: 8px; display: none; }
+    .storm-timestamps.active { display: block; }
+    .timestamp-item { padding: 6px 8px; cursor: pointer; border-radius: 4px; }
+    .timestamp-item:hover { background: #f0f8ff; }
 
-        .chat-window {
-            flex-grow: 1;
-            overflow-y: auto;
-            padding: 15px;
-            border: 1px solid #ddd;
-            background-color: #f9f9f9;
-            margin-bottom: 10px;
-            border-radius: 5px;
-        }
+    .add-menu {
+      position: absolute;
+      background: white;
+      border: 1px solid #ddd;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+      border-radius: 6px;
+      padding: 6px 8px;
+      z-index: 2000;
+      display: none;
+      min-width: 160px;
+    }
+    .add-menu button {
+      display: block;
+      width: 100%;
+      text-align: left;
+      padding: 8px 10px;
+      border: none;
+      background: none;
+      cursor: pointer;
+    }
+    .add-menu button:hover { background: #f6f9ff; }
+  </style>
 
-        .chat-input-container {
-            display: flex;
-            padding: 10px;
-            border-top: 1px solid #eee;
-        }
-
-        #chat-input {
-            flex-grow: 1;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            margin-right: 10px;
-        }
-
-        #send-btn {
-            padding: 10px 15px;
-            background-color: #9917bd;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-
-        #send-btn:hover {
-            background-color: #7db7dd;
-        }
-
-        #civilian-send-btn {
-            padding: 10px 15px;
-            background-color: #1ed3d6;
-            color: black;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-
-        #enterprise-send-btn {
-            padding: 10px 15px;
-            background-color: #1ed3d6;
-            color: black;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-
-        #civilian-chat-input, #enterprise-chat-input {
-            flex-grow: 1;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            margin-right: 10px;
-        }
-
-        .message-user, .message-bot {
-            margin-bottom: 10px;
-            padding: 8px 12px;
-            border-radius: 15px;
-            max-width: 70%;
-        }
-
-        .message-user {
-            background-color: #d1e7dd; /* Light green-blue */
-            align-self: flex-end;
-            margin-left: auto;
-        }
-
-        .message-bot {
-            background-color: #f0f0f0; /* Light gray */
-            align-self: flex-start;
-            margin-right: auto;
-        }
-
-        /* Chat panels are now separate tabs (civilian & enterprise) */
-
-        .toggle-chat-btn {
-            position: absolute;
-            right: 60px;
-            bottom: 20px;
-            z-index: 60;
-            padding: 14px 18px;
-            border-radius: 999px;
-            background-color: #9917bd; 
-            color: white;
-            border: none;
-            box-shadow: 0 6px 16px rgba(52,152,219,0.28);
-            cursor: pointer;
-            font-size: 18px;    /* set text size */
-            line-height: 1.2;
-        }
-
-        .locate-me-btn {
-            position: fixed; /* fixed to viewport so it's always visible above the map */
-            right: 100px;
-            bottom: 25px;
-            z-index: 9999; /* ensure it sits on top of map layers */
-            padding: 10px 14px;
-            border-radius: 6px;
-            background-color: #2ecc71;
-            color: white;
-            border: none;
-            box-shadow: 0 4px 12px rgba(46,204,113,0.18);
-            cursor: pointer;
-            font-size: 14px;
-        }
-
-        .coords-display {
-            position: absolute;
-            right: 20px;
-            bottom: 76px;
-            z-index: 65;
-            background: rgba(0,0,0,0.7);
-            color: #fff;
-            padding: 8px 12px;
-            border-radius: 6px;
-            font-size: 13px;
-            display: none;
-        }
-
-        /* About page layout */
-        .about-container {
-            display: flex;
-            gap: 20px;
-            align-items: flex-start;
-        }
-
-        .about-left {
-            flex: 1 1 60%;
-        }
-
-        .about-right {
-            flex: 0 0 240px;
-            background: #fafafa;
-            border-left: 1px solid #eee;
-            padding-left: 16px;
-        }
-
-        .about-images {
-            display: flex;
-            gap: 12px;
-            align-items: flex-start;
-            flex-wrap: wrap;
-        }
-
-        .about-images img.about-image {
-            /* Let images share the available space without forcing horizontal overflow */
-            flex: 1 1 50%;
-            max-width: 50%;
-            width: 100%;
-            height: auto;
-            border-radius: 8px;
-            display: block;
-            margin-bottom: 12px;
-            object-fit: cover;
-        }
-        /* Hurricanes folder UI */
-        .hurricane-list {
-            max-height: 70vh;
-            overflow: auto;
-            border: 1px solid #eee;
-            padding: 12px;
-            border-radius: 6px;
-            background: #fafafa;
-        }
-        .storm-item { margin-bottom: 8px; }
-        .storm-header { cursor: pointer; padding: 8px; background: #fff; border: 1px solid #e6e6e6; border-radius: 6px; }
-        .storm-timestamps { margin-top: 6px; margin-left: 8px; display: none; }
-        .storm-timestamps.active { display: block; }
-        .timestamp-item { padding: 6px 8px; cursor: pointer; border-radius: 4px; }
-        .timestamp-item:hover { background: #f0f8ff; }
-
-        /* Add-button styles */
-        .add-btn {
-            margin-left: 8px;
-            padding: 8px 10px;
-            background: #2ecc71;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .add-menu {
-            position: absolute;
-            background: white;
-            border: 1px solid #ddd;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
-            border-radius: 6px;
-            padding: 6px 8px;
-            z-index: 2000;
-            display: none;
-            min-width: 160px;
-        }
-
-        .add-menu button {
-            display: block;
-            width: 100%;
-            text-align: left;
-            padding: 8px 10px;
-            border: none;
-            background: none;
-            cursor: pointer;
-        }
-
-        .add-menu button:hover { background: #f6f9ff; }
-    </style>
+  <!-- Markdown parser + sanitizer -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
 </head>
+
 <body>
+  <div class="sidebar">
+    <div class="sidebar-title">Cvclone</div>
+    <a class="nav-link active" data-tab="home" onclick="openTab('home')">Home</a>
+    <a class="nav-link" data-tab="civilian" onclick="openTab('civilian')">Civilian</a>
+    <a class="nav-link" data-tab="enterprise" onclick="openTab('enterprise')">Enterprise</a>
+    <a class="nav-link" data-tab="hurricanes" onclick="openTab('hurricanes')">Hurricanes</a>
+    <a class="nav-link" data-tab="about" onclick="openTab('about')">About me</a>
+  </div>
 
-        <div class="sidebar">
-        <div class="sidebar-title">Cvclone</div>
-        <a class="nav-link active" data-tab="home" onclick="openTab('home')">Home</a>
-        <a class="nav-link" data-tab="civilian" onclick="openTab('civilian')">Civilian</a>
-        <a class="nav-link" data-tab="enterprise" onclick="openTab('enterprise')">Enterprise</a>
-        <a class="nav-link" data-tab="hurricanes" onclick="openTab('hurricanes')">Hurricanes</a>
-        <a class="nav-link" data-tab="about" onclick="openTab('about')">About me</a>
+  <div class="content-area">
+    <!-- Home -->
+    <div id="home-content" class="tab-content active">
+      <div id="map"></div>
+      <button id="locate-me-btn" class="locate-me-btn">Use my location</button>
+      <div id="coords-display" class="coords-display" aria-live="polite"></div>
     </div>
 
-    <div class="content-area">
-
-        <div id="home-content" class="tab-content active">
-            <div id="map"></div>
-
-            <!-- Locate button + coords display -->
-            <button id="locate-me-btn" class="locate-me-btn">Use my location</button>
-            <div id="coords-display" class="coords-display" aria-live="polite"></div>
-        </div>
-
-        <!-- Civilian chat tab -->
-        <div id="civilian-content" class="tab-content">
-            <h2>Civilian Chat</h2>
-            <div class="chat-window" id="civilian-chat-window">
-                <div class="message-bot">Civilian assistant ready.</div>
-            </div>
-            <div class="chat-input-container">
-                <input type="text" id="civilian-chat-input" placeholder="Ask the civilian assistant...">
-                <button id="civilian-send-btn">Send</button>
-                <button id="civilian-add-btn" class="add-btn" title="More options" aria-label="More options">
-                    <!-- plus icon (SVG) -->
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                        <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                </button>
-                <input type="file" id="civilian-file-input" accept="image/*" style="display:none" />
-            </div>
-        </div>
-
-        <!-- Enterprise chat tab -->
-        <div id="enterprise-content" class="tab-content">
-            <h2>Enterprise Chat</h2>
-            <div class="chat-window" id="enterprise-chat-window">
-                <div class="message-bot">Enterprise assistant online.</div>
-            </div>
-            <div class="chat-input-container">
-                <input type="text" id="enterprise-chat-input" placeholder="Ask the enterprise assistant...">
-                <button id="enterprise-send-btn">Send</button>
-                <button id="enterprise-add-btn" class="add-btn" title="More options" aria-label="More options">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                        <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                </button>
-                <input type="file" id="enterprise-file-input" accept="image/*" style="display:none" />
-            </div>
-        </div>
-
-        <!-- Hurricanes tab -->
-        <div id="hurricanes-content" class="tab-content">
-            <h2>Hurricanes</h2>
-            <p>Browse storms grouped by storm id. Expand a storm to see timestamps; click a timestamp to draw it on the map.</p>
-            <div id="hurricane-list" class="hurricane-list">
-                <p>Loading storms...</p>
-            </div>
-        </div>
-
-        <!-- About Me tab -->
-        <div id="about-content" class="tab-content">
-            <h1>About me</h1>
-            <div class="about-container">
-                <div class="about-left">
-                    <div class="about-images">
-                        <img src="./thegang.jpg" alt="Gang photo" class="about-image">
-                        <img src="./thegangfeelingsilly.jpg" alt="Silly gang" class="about-image">
-                    </div>
-                    <p>Cvclone is a prototype web app for hurricane/disaster preparedness that combines an interactive Google Maps frontend (image overlays, storm track visualizations, Civilian/Enterprise chat) with a set of backend agents for routing, supply planning, and a Gemini-powered chatbot.</p>
-                </div>
-                <div class="about-right">
-                    <h2>Credits</h2>
-                        <h4>Adam Mouedden</h4>
-                        <h4>David Orjuela</h4>
-                        <h4>Kenta Festag</h4>
-                        <h4>Sofia Flores</h4>    
-                </div>
-            </div>
-        </div>
+    <!-- Civilian chat tab -->
+    <div id="civilian-content" class="tab-content">
+      <h2>Civilian Chat</h2>
+      <div class="chat-window" id="civilian-chat-window">
+        <div class="message-bot" id="civilian-seed"></div>
+      </div>
+      <div class="chat-input-container">
+        <input type="text" id="civilian-chat-input" placeholder="Ask the civilian assistant..."/>
+        <button id="civilian-send-btn">Send</button>
+        <button id="civilian-add-btn" class="add-btn" title="More options" aria-label="More options">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <input type="file" id="civilian-file-input" accept="image/*" style="display:none"/>
+      </div>
     </div>
 
-    <script>
-        // --- Tab Switching Logic ---
-        const tabContents = document.querySelectorAll('.tab-content');
-        const navLinks = document.querySelectorAll('.nav-link');
+    <!-- Enterprise chat tab -->
+    <div id="enterprise-content" class="tab-content">
+      <h2>Enterprise Chat</h2>
+      <div class="chat-window" id="enterprise-chat-window">
+        <div class="message-bot" id="enterprise-seed"></div>
+      </div>
+      <div class="chat-input-container">
+        <input type="text" id="enterprise-chat-input" placeholder="Ask the enterprise assistant..."/>
+        <button id="enterprise-send-btn">Send</button>
+        <button id="enterprise-add-btn" class="add-btn" title="More options" aria-label="More options">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <input type="file" id="enterprise-file-input" accept="image/*" style="display:none"/>
+      </div>
+    </div>
 
-    // --- Overlay configuration (edit these values to change the image and its bounds) ---
-    // Change IMAGE_OVERLAY_URL to point to a different image file (relative to this HTML file)
+    <!-- Hurricanes tab -->
+    <div id="hurricanes-content" class="tab-content">
+      <h2>Hurricanes</h2>
+      <p>Browse storms grouped by storm id. Expand a storm to see timestamps; click a timestamp to draw it on the map.</p>
+      <div id="hurricane-list" class="hurricane-list"><p>Loading storms...</p></div>
+    </div>
+
+    <!-- About -->
+    <div id="about-content" class="tab-content">
+      <h1>About me</h1>
+      <div class="about-container">
+        <div class="about-left">
+          <div class="about-images">
+            <img src="./thegang.jpg" alt="Gang photo" class="about-image"/>
+            <img src="./thegangfeelingsilly.jpg" alt="Silly gang" class="about-image"/>
+          </div>
+          <p>
+            Team Members (from left to right): Adam Mouedden, Sofia Flores, David Orjeula, and Kenta Festag.
+          </p>
+          <br>
+          <hr>
+          <p>
+            Cvclone is a prototype hurricane-readiness platform that pairs a GRU sequence model (PyTorch), trained from scratch on HURSAT, with an agentic AI orchestration layer inside a fast, map-first web app.
+             The GRU ingests historical satellite/track signals to predict future position and intensity; forecasts render as interactive, spaghetti paths overlain on Google Maps.
+              On top, agentic AI systems with tool access (data ingestion, retrieval, cache augmented generation, structured planning) convert predictions into concrete actions: supply staging, evacuation routing, and tailored guidance delivered through Civilian and Enterprise chat. 
+            The result: an end-to-end loop from learned trajectory forecasting to operational recommendations you can act on in one interface.
+          </p>
+          
+          
+        </div>
+        <div class="about-right">
+          <h2>Credits</h2>
+          <h4>Adam Mouedden</h4>
+          <h4>David Orjuela</h4>
+          <h4>Kenta Festag</h4>
+          <h4>Sofia Flores</h4>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Core scripts -->
+  <script>
+    // ---------- Markdown helper (safe) ----------
+    function renderMarkdown(mdText) {
+      try {
+        const html = marked.parse(mdText ?? '', { breaks: true });
+        return DOMPurify.sanitize(html);
+      } catch (_) {
+        return DOMPurify.sanitize(String(mdText ?? ''));
+      }
+    }
+
+    // ---------- Tabs ----------
+    const tabContents = document.querySelectorAll('.tab-content');
+    const navLinks = document.querySelectorAll('.nav-link');
+
+    function openTab(tabName) {
+      if (typeof hideAddMenus === 'function') hideAddMenus();
+
+      tabContents.forEach(c => c.classList.remove('active'));
+      navLinks.forEach(l => l.classList.remove('active'));
+
+      document.getElementById(tabName + '-content').classList.add('active');
+      document.querySelector(`.nav-link[data-tab="${tabName}"]`).classList.add('active');
+
+      if (tabName === 'home') {
+        setTimeout(() => {
+          initMap();
+          requestUserLocation().catch(() => {});
+        }, 100);
+      } else {
+        if (typeof clearHurricaneDrawings === 'function') {
+          try { clearHurricaneDrawings(); } catch (_) {}
+        }
+      }
+
+      if (tabName === 'civilian') {
+        const input = document.getElementById('civilian-chat-input');
+        const win = document.getElementById('civilian-chat-window');
+        if (input) input.focus();
+        if (win) win.scrollTop = win.scrollHeight;
+      }
+      if (tabName === 'enterprise') {
+        const input = document.getElementById('enterprise-chat-input');
+        const win = document.getElementById('enterprise-chat-window');
+        if (input) input.focus();
+        if (win) win.scrollTop = win.scrollHeight;
+      }
+    }
+
+    // ---------- Map & overlay ----------
+    let map;
+    let imageOverlay = null;
+
     const IMAGE_OVERLAY_URL = './ultimateimage.png';
-
-    // Two ways to configure overlay bounds:
-    // 1) Explicit bounds (recommended if you already know them):
-    //    { north: <lat>, south: <lat>, east: <lng>, west: <lng> }
-    // 2) Center + dimensions in meters (easier to edit). Set
-    //    IMAGE_OVERLAY_USE_CENTER = true and provide IMAGE_OVERLAY_CENTER + width/height.
-
-    // Use explicit bounds by default (edit these if you prefer direct control)
-    const IMAGE_OVERLAY_USE_CENTER = false; // set true to compute bounds from center + size
+    const IMAGE_OVERLAY_USE_CENTER = false;
     const IMAGE_OVERLAY_BOUNDS = { north: 28.5483, south: 28.5283, east: -81.3692, west: -81.3892 };
+    const IMAGE_OVERLAY_CENTER = { lat: 28.5383, lng: -81.3792 };
+    const IMAGE_OVERLAY_WIDTH_METERS = 2000;
+    const IMAGE_OVERLAY_HEIGHT_METERS = 2000;
 
-    // Optional: when IMAGE_OVERLAY_USE_CENTER === true you can set these instead
-    const IMAGE_OVERLAY_CENTER = { lat: 28.5383, lng: -81.3792 }; // center point for overlay
-    const IMAGE_OVERLAY_WIDTH_METERS = 2000; // east-west width in meters
-    const IMAGE_OVERLAY_HEIGHT_METERS = 2000; // north-south height in meters
-
-    // --- Helper: validate bounds and compute from center+size when requested ---
-    function isFiniteNumber(n) {
-        return typeof n === 'number' && isFinite(n);
-    }
-
+    function isFiniteNumber(n) { return typeof n === 'number' && isFinite(n); }
     function validateBounds(bounds) {
-        if (!bounds || typeof bounds !== 'object') return false;
-        const { north, south, east, west } = bounds;
-        if (![north, south, east, west].every(isFiniteNumber)) return false;
-        // basic ordering checks
-        if (!(north > south)) return false;
-        // east/west can wrap the antimeridian in some cases; here we expect east > west for simplicity
-        if (!(east > west)) return false;
-        // lat range clamp
-        if (north > 90 || south < -90) return false;
-        if (east > 180 || west < -180) return false;
-        return true;
+      if (!bounds || typeof bounds !== 'object') return false;
+      const { north, south, east, west } = bounds;
+      if (![north, south, east, west].every(isFiniteNumber)) return false;
+      if (!(north > south)) return false;
+      if (!(east > west)) return false;
+      if (north > 90 || south < -90) return false;
+      if (east > 180 || west < -180) return false;
+      return true;
     }
-
-    // Approximate conversion from meters to degrees at a given latitude.
-    // Uses mean earth radius approximation: 1 deg latitude ~= 111,320 meters.
-    function metersToDegreesLat(meters) {
-        return meters / 111320;
+    function metersToDegreesLat(m) { return m / 111320; }
+    function metersToDegreesLng(m, lat) {
+      const latRad = (lat * Math.PI) / 180;
+      const metersPerDeg = 111320 * Math.cos(latRad);
+      return metersPerDeg === 0 ? 0 : m / metersPerDeg;
     }
-
-    function metersToDegreesLng(meters, atLat) {
-        // Longitude degrees scale with cos(latitude)
-        const latRad = (atLat * Math.PI) / 180;
-        const metersPerDeg = 111320 * Math.cos(latRad);
-        // avoid divide-by-zero near poles
-        return metersPerDeg === 0 ? 0 : meters / metersPerDeg;
-    }
-
     function computeBoundsFromCenter(center, widthMeters, heightMeters) {
-        if (!center || !isFiniteNumber(center.lat) || !isFiniteNumber(center.lng)) return null;
-        const halfHeightDeg = metersToDegreesLat(heightMeters / 2);
-        const halfWidthDeg = metersToDegreesLng(widthMeters / 2, center.lat);
-        return {
-            north: center.lat + halfHeightDeg,
-            south: center.lat - halfHeightDeg,
-            east: center.lng + halfWidthDeg,
-            west: center.lng - halfWidthDeg
-        };
+      if (!center || !isFiniteNumber(center.lat) || !isFiniteNumber(center.lng)) return null;
+      const halfH = metersToDegreesLat(heightMeters / 2);
+      const halfW = metersToDegreesLng(widthMeters / 2, center.lat);
+      return { north: center.lat + halfH, south: center.lat - halfH, east: center.lng + halfW, west: center.lng - halfW };
     }
-
     function getOverlayBounds() {
-        if (IMAGE_OVERLAY_USE_CENTER) {
-            const b = computeBoundsFromCenter(IMAGE_OVERLAY_CENTER, IMAGE_OVERLAY_WIDTH_METERS, IMAGE_OVERLAY_HEIGHT_METERS);
-            if (b && validateBounds(b)) return b;
-            console.warn('Computed bounds from center are invalid, falling back to IMAGE_OVERLAY_BOUNDS if valid.');
-        }
-        if (validateBounds(IMAGE_OVERLAY_BOUNDS)) return IMAGE_OVERLAY_BOUNDS;
-        // Last-resort: attempt to compute from center values if available
-        const fallback = computeBoundsFromCenter(IMAGE_OVERLAY_CENTER, IMAGE_OVERLAY_WIDTH_METERS, IMAGE_OVERLAY_HEIGHT_METERS);
-        if (fallback && validateBounds(fallback)) return fallback;
-        // If nothing valid, return a very small default around center or zero-area box to avoid exceptions
-        console.warn('No valid overlay bounds available — using tiny fallback box at (0,0).');
-        return { north: 0.0001, south: -0.0001, east: 0.0001, west: -0.0001 };
+      if (IMAGE_OVERLAY_USE_CENTER) {
+        const b = computeBoundsFromCenter(IMAGE_OVERLAY_CENTER, IMAGE_OVERLAY_WIDTH_METERS, IMAGE_OVERLAY_HEIGHT_METERS);
+        if (b && validateBounds(b)) return b;
+        console.warn('Computed overlay bounds invalid; falling back to explicit bounds if valid.');
+      }
+      if (validateBounds(IMAGE_OVERLAY_BOUNDS)) return IMAGE_OVERLAY_BOUNDS;
+      const fb = computeBoundsFromCenter(IMAGE_OVERLAY_CENTER, IMAGE_OVERLAY_WIDTH_METERS, IMAGE_OVERLAY_HEIGHT_METERS);
+      if (fb && validateBounds(fb)) return fb;
+      console.warn('No valid overlay bounds; using tiny fallback at (0,0).');
+      return { north: 0.0001, south: -0.0001, east: 0.0001, west: -0.0001 };
     }
 
-        function openTab(tabName) {
-            // Hide any open add-menus when switching tabs
-            if (typeof hideAddMenus === 'function') hideAddMenus();
-            // Deactivate all tab contents and navigation links
-            console.log("(1)Switching a tab:");
-            console.log("Tab Contents: ", tabContents);
-            console.log("Nav Links: ", navLinks);
+    function initMap() {
+      if (typeof google === 'undefined' || !google.maps) return;
+      const mapDiv = document.getElementById('map');
+      if (!mapDiv) return;
 
-            tabContents.forEach(content => content.classList.remove('active'));
-            navLinks.forEach(link => link.classList.remove('active'));
-            console.log("(2)Removed All:");
-            console.log("Tab Contents: ", tabContents);
-            console.log("Nav Links: ", navLinks);
+      if (!map) {
+        const initialPos = { lat: 30.758925, lng: -80.376627 };
+        map = new google.maps.Map(mapDiv, {
+          center: initialPos,
+          zoom: 10,
+          mapId: 'DEMO_MAP_ID',
+        });
+        placeImageOverlay(IMAGE_OVERLAY_URL, getOverlayBounds());
+        requestUserLocation().catch(() => {});
+      } else {
+        google.maps.event.trigger(map, 'resize');
+      }
+    }
 
-            // Activate the selected tab content and navigation link
-            document.getElementById(tabName + '-content').classList.add('active');
-            document.querySelector(`.nav-link[data-tab="${tabName}"]`).classList.add('active');
-            console.log("(3)Activated Selected:");
-            console.log("Tab Contents: ", tabContents);
-            console.log("Nav Links: ", navLinks);
+    function placeImageOverlay(imageUrl, bounds) {
+      if (map && imageOverlay) imageOverlay.setMap(null);
+      const latLngBounds = new google.maps.LatLngBounds(
+        new google.maps.LatLng(bounds.south, bounds.west),
+        new google.maps.LatLng(bounds.north, bounds.east)
+      );
+      imageOverlay = new google.maps.GroundOverlay(imageUrl, latLngBounds, { map, opacity: 0.8 });
+    }
+    function updateCameraFeedOverlay() { placeImageOverlay(IMAGE_OVERLAY_URL, getOverlayBounds()); }
 
-            // If switching to the 'home' tab, ensure the map initializes/resizes
-            if (tabName === 'home') {
-                // This calls the map initialization function defined later
-                setTimeout(() => {
-                    initMap();
-                    // try to request user location when entering home (only once)
-                    requestUserLocation().catch(() => {});
-                }, 100);
-            }
-            // Focus chat inputs when opening their tabs and scroll to bottom
-            if (tabName === 'civilian') {
-                const input = document.getElementById('civilian-chat-input');
-                const win = document.getElementById('civilian-chat-window');
-                if (input) input.focus();
-                if (win) win.scrollTop = win.scrollHeight;
-            }
-            if (tabName === 'enterprise') {
-                const input = document.getElementById('enterprise-chat-input');
-                const win = document.getElementById('enterprise-chat-window');
-                if (input) input.focus();
-                if (win) win.scrollTop = win.scrollHeight;
-            }
-        }
+    // ---------- Chat (Markdown-enabled bot messages) ----------
+    async function sendChatMessage(inputId, windowId) {
+      const input = document.getElementById(inputId);
+      const chatWindow = document.getElementById(windowId);
+      const messageText = (input.value || '').trim();
+      if (!messageText) return;
 
-        // --- Google Maps Logic ---
-        let map;
-        let imageOverlay = null; // Variable to hold the GroundOverlay object
+      const userMsg = document.createElement('div');
+      userMsg.className = 'message-user';
+      userMsg.textContent = messageText; // user stays plain-text
+      chatWindow.appendChild(userMsg);
+      input.value = '';
 
-        function initMap() {
-            // Only run if Google Maps API is loaded
-            if (typeof google === 'undefined' || !google.maps) return;
+      const isCivilian = inputId.includes('civilian');
+      const backendUrl = isCivilian
+        ? 'http://localhost:5001/api/chat/civilian'
+        : 'http://localhost:5001/api/chat/enterprise';
 
-            // Check if the map div exists and is visible
-            const mapDiv = document.getElementById('map');
-            if (!mapDiv) return;
-
-            // Only create the map if it hasn't been created yet
-            if (!map) {
-                // Default location: Central Florida (using your existing values)
-                //{ lat: 25.758925, lng: -80.376627}
-                const initialPos = { lat: 30.758925, lng: -80.376627};
-
-                map = new google.maps.Map(mapDiv, {
-                    center: initialPos,
-                    zoom: 10,
-                    mapId: 'DEMO_MAP_ID', // Recommended for custom styling
-                });
-
-                // No default marker is placed here so the map starts clean.
-
-                // ⭐ NEW: Load the image overlay immediately after map initialization
-                // Mock coordinates for the image overlay (e.g., covering a 1-mile square)
-                // Use configured overlay values (change at top of file)
-                placeImageOverlay(IMAGE_OVERLAY_URL, getOverlayBounds());
-
-                // After the map has been initialized, try requesting user location once
-                requestUserLocation().catch(() => {});
-
-            } else {
-                // For existing map, this might trigger a resize if needed
-                google.maps.event.trigger(map, 'resize');
-            }
-        }
-
-        // ⭐ NEW FUNCTION: Fetches and places the image as a GroundOverlay
-        function placeImageOverlay(imageUrl, bounds) {
-            if (map && imageOverlay) {
-                // Remove existing overlay before placing a new one (e.g., when updating feed)
-                imageOverlay.setMap(null);
-            }
-
-            // Convert the plain bounds object into a google.maps.LatLngBounds object
-            const latLngBounds = new google.maps.LatLngBounds(
-                new google.maps.LatLng(bounds.south, bounds.west),
-                new google.maps.LatLng(bounds.north, bounds.east)
-            );
-
-            // Create the GroundOverlay
-            imageOverlay = new google.maps.GroundOverlay(
-                imageUrl,
-                latLngBounds,
-                {
-                    map: map, // Attaches the overlay to the map object
-                    opacity: 0.8 // Optional: make it slightly transparent
-                }
-            );
-
-            console.log(`GroundOverlay placed: ${imageUrl}`);
-        }
-
-
-        // You would typically use a function like this to dynamically update the image URL:
-        
-        function updateCameraFeedOverlay() {
-            // Use configured overlay values (change IMAGE_OVERLAY_URL and IMAGE_OVERLAY_BOUNDS above)
-            placeImageOverlay(IMAGE_OVERLAY_URL, getOverlayBounds());
-        }
-        
-
-        // --- Chatbot Logic (Mock) for two separate chats ---
-        async function sendChatMessage(inputId, windowId) {
-            const input = document.getElementById(inputId);
-            const messageText = input.value.trim();
-            const chatWindow = document.getElementById(windowId);
-
-            if (messageText === "") return;
-
-            const userMessageDiv = document.createElement('div');
-            userMessageDiv.className = 'message-user';
-            userMessageDiv.textContent = messageText;
-            chatWindow.appendChild(userMessageDiv);
-            input.value = '';
-
-            // Choose backend endpoint based on which chat (civilian vs enterprise) invoked the function
-            const isCivilian = inputId.includes('civilian');
-            const backendUrl = isCivilian ? 'http://localhost:5001/api/chat/civilian' : 'http://localhost:5001/api/chat/enterprise';
-
-            try {
-                const resp = await fetch(backendUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text: messageText })
-                });
-                if (resp.ok) {
-                    const data = await resp.json();
-                    const botMessageDiv = document.createElement('div');
-                    botMessageDiv.className = 'message-bot';
-                    botMessageDiv.textContent = data.reply || 'No reply';
-                    chatWindow.appendChild(botMessageDiv);
-                } else {
-                    const botMessageDiv = document.createElement('div');
-                    botMessageDiv.className = 'message-bot';
-                    botMessageDiv.textContent = `Server error: ${resp.status}`;
-                    chatWindow.appendChild(botMessageDiv);
-                }
-            } catch (err) {
-                const botMessageDiv = document.createElement('div');
-                botMessageDiv.className = 'message-bot';
-                botMessageDiv.textContent = `I received: "${messageText}"`;
-                chatWindow.appendChild(botMessageDiv);
-            }
-
-            chatWindow.scrollTop = chatWindow.scrollHeight;
-        }
-
-        // Wire civilian chat
-        document.getElementById('civilian-send-btn').addEventListener('click', () => sendChatMessage('civilian-chat-input', 'civilian-chat-window'));
-        document.getElementById('civilian-chat-input').addEventListener('keypress', function(e) { if (e.key === 'Enter') sendChatMessage('civilian-chat-input', 'civilian-chat-window'); });
-
-        // Wire enterprise chat
-        document.getElementById('enterprise-send-btn').addEventListener('click', () => sendChatMessage('enterprise-chat-input', 'enterprise-chat-window'));
-        document.getElementById('enterprise-chat-input').addEventListener('keypress', function(e) { if (e.key === 'Enter') sendChatMessage('enterprise-chat-input', 'enterprise-chat-window'); });
-
-        // --- Add-button (plus) behavior: show small menu with Attach Image / Insert Template ---
-        function createAddMenu() {
-            const menu = document.createElement('div');
-            menu.className = 'add-menu';
-            const attachBtn = document.createElement('button');
-            attachBtn.textContent = 'Attach image';
-            const templateBtn = document.createElement('button');
-            templateBtn.textContent = 'Insert template';
-            menu.appendChild(attachBtn);
-            menu.appendChild(templateBtn);
-            document.body.appendChild(menu);
-            // prevent clicks inside the menu from bubbling to document (which would hide menus)
-            menu.addEventListener('click', (ev) => ev.stopPropagation());
-            return { menu, attachBtn, templateBtn };
-        }
-
-        const civilianMenuParts = createAddMenu();
-        const enterpriseMenuParts = createAddMenu();
-
-        function showMenuFor(buttonEl, menuParts, inputId) {
-            // hide any other menus first
-            hideAddMenus();
-            const rect = buttonEl.getBoundingClientRect();
-            // Position the menu to the left of the button if near the right edge
-            const menuWidth = 160;
-            let left = rect.right - menuWidth;
-            if (left < 8) left = rect.left;
-            menuParts.menu.style.left = (left) + 'px';
-            menuParts.menu.style.top = (rect.top - 6) + 'px';
-            menuParts.menu.style.display = 'block';
-
-            // attach handlers (stopPropagation inside menu prevents immediate document click hide)
-            menuParts.attachBtn.onclick = (ev) => {
-                ev.stopPropagation();
-                document.getElementById(inputId + '-file-input').click();
-                menuParts.menu.style.display = 'none';
-            };
-            menuParts.templateBtn.onclick = (ev) => {
-                ev.stopPropagation();
-                const input = document.getElementById(inputId);
-                input.value = 'I request assistance for my area: [city], [state]. Please advise.';
-                menuParts.menu.style.display = 'none';
-                input.focus();
-            };
-        }
-
-        // Hook add buttons
-        const civAddBtn = document.getElementById('civilian-add-btn');
-        const entAddBtn = document.getElementById('enterprise-add-btn');
-        // Stop propagation on add-button clicks so the document-level click handler doesn't hide the menu immediately
-        civAddBtn.addEventListener('click', (e) => { e.stopPropagation(); showMenuFor(e.currentTarget, civilianMenuParts, 'civilian-chat-input'); });
-        entAddBtn.addEventListener('click', (e) => { e.stopPropagation(); showMenuFor(e.currentTarget, enterpriseMenuParts, 'enterprise-chat-input'); });
-
-        // Hide menus helper
-        function hideAddMenus() {
-            [civilianMenuParts, enterpriseMenuParts].forEach(p => {
-                if (p && p.menu) p.menu.style.display = 'none';
-            });
-        }
-
-        // Clicking anywhere outside add-buttons or menus hides the menus
-        document.addEventListener('click', function() {
-            hideAddMenus();
+      try {
+        const resp = await fetch(backendUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: messageText })
         });
 
-        // File input handlers: when a file is selected, show a small preview and inject placeholder text
-        document.getElementById('civilian-file-input').addEventListener('change', function(e) {
-            const file = e.target.files && e.target.files[0];
-            if (!file) return;
-            const input = document.getElementById('civilian-chat-input');
-            input.value = `[attached image: ${file.name}]`;
-        });
-        document.getElementById('enterprise-file-input').addEventListener('change', function(e) {
-            const file = e.target.files && e.target.files[0];
-            if (!file) return;
-            const input = document.getElementById('enterprise-chat-input');
-            input.value = `[attached image: ${file.name}]`;
-        });
+        const botMessageDiv = document.createElement('div');
+        botMessageDiv.className = 'message-bot';
 
-        // --- Initialization ---
-        document.addEventListener('DOMContentLoaded', () => {
-            // wire locate button and coords display now that elements exist
-            locateMeBtn = document.getElementById('locate-me-btn');
-            coordsDisplay = document.getElementById('coords-display');
-            if (locateMeBtn) locateMeBtn.addEventListener('click', () => requestUserLocation(true).catch(() => {}));
+        if (resp.ok) {
+          let data;
+          const ct = resp.headers.get('content-type') || '';
+          data = ct.includes('application/json') ? await resp.json() : await resp.text();
 
-            // Attempt to request user location on initial load (will only prompt once)
-            requestUserLocation().catch(() => {});
+          const reply = (typeof data === 'string')
+            ? data
+            : (data?.reply ?? 'No reply');
 
-            // Add event listener for dynamic resizing (good practice)
-            window.addEventListener('resize', () => {
-                if (map) {
-                    google.maps.event.trigger(map, 'resize');
-                }
-            });
-        });
+          botMessageDiv.innerHTML = renderMarkdown(reply);
+        } else {
+          botMessageDiv.innerHTML = renderMarkdown(`Server error: **${resp.status}**`);
+        }
 
-        // --- Chat Panel Toggle Logic ---
-        // Chat panel/toggle removed; chats live in separate tabs
+        chatWindow.appendChild(botMessageDiv);
+      } catch (err) {
+        const botMessageDiv = document.createElement('div');
+        botMessageDiv.className = 'message-bot';
+        botMessageDiv.innerHTML = renderMarkdown(`I received:\n\n\`\`\`\n${messageText}\n\`\`\``);
+        chatWindow.appendChild(botMessageDiv);
+      }
 
-    // --- Geolocation (Use my location) ---
+      chatWindow.scrollTop = chatWindow.scrollHeight;
+    }
+
+    // Seed messages as Markdown
+    function seedChats() {
+      const civSeed = document.getElementById('civilian-seed');
+      const entSeed = document.getElementById('enterprise-seed');
+      if (civSeed) civSeed.innerHTML = renderMarkdown('**Civilian assistant** ready.');
+      if (entSeed) entSeed.innerHTML = renderMarkdown('**Enterprise assistant** online.');
+    }
+
+    document.getElementById('civilian-send-btn').addEventListener('click', () => sendChatMessage('civilian-chat-input', 'civilian-chat-window'));
+    document.getElementById('civilian-chat-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') sendChatMessage('civilian-chat-input', 'civilian-chat-window'); });
+    document.getElementById('enterprise-send-btn').addEventListener('click', () => sendChatMessage('enterprise-chat-input', 'enterprise-chat-window'));
+    document.getElementById('enterprise-chat-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') sendChatMessage('enterprise-chat-input', 'enterprise-chat-window'); });
+
+    // ---------- Add-menu / attachments ----------
+    function createAddMenu() {
+      const menu = document.createElement('div');
+      menu.className = 'add-menu';
+      const attachBtn = document.createElement('button'); attachBtn.textContent = 'Attach image';
+      const templateBtn = document.createElement('button'); templateBtn.textContent = 'Insert template';
+      menu.append(attachBtn, templateBtn);
+      document.body.appendChild(menu);
+      menu.addEventListener('click', (ev) => ev.stopPropagation());
+      return { menu, attachBtn, templateBtn };
+    }
+    const civilianMenuParts = createAddMenu();
+    const enterpriseMenuParts = createAddMenu();
+
+    function showMenuFor(buttonEl, menuParts, inputId) {
+      hideAddMenus();
+      const rect = buttonEl.getBoundingClientRect();
+      const menuWidth = 160;
+      let left = rect.right - menuWidth;
+      if (left < 8) left = rect.left;
+      menuParts.menu.style.left = left + 'px';
+      menuParts.menu.style.top = (rect.top - 6) + 'px';
+      menuParts.menu.style.display = 'block';
+
+      const textInput = document.getElementById(inputId);
+      const fileInput =
+        document.getElementById(inputId + '-file-input') ||
+        document.getElementById(inputId.replace(/-chat-input$/, '') + '-file-input') ||
+        document.getElementById(inputId.replace(/-chat-input$/, '') + '_file') ||
+        document.querySelector('input[type=file]');
+
+      menuParts.attachBtn.onclick = (ev) => {
+        ev.stopPropagation();
+        if (fileInput) fileInput.click();
+        menuParts.menu.style.display = 'none';
+      };
+      menuParts.templateBtn.onclick = (ev) => {
+        ev.stopPropagation();
+        if (textInput) {
+          textInput.value = 'I request assistance for my area: [city], [state]. Please advise.';
+          textInput.focus();
+        }
+        menuParts.menu.style.display = 'none';
+      };
+    }
+    function hideAddMenus() { [civilianMenuParts, enterpriseMenuParts].forEach(p => p.menu.style.display = 'none'); }
+
+    const civAddBtn = document.getElementById('civilian-add-btn');
+    const entAddBtn = document.getElementById('enterprise-add-btn');
+    civAddBtn.addEventListener('click', (e) => { e.stopPropagation(); showMenuFor(e.currentTarget, civilianMenuParts, 'civilian-chat-input'); });
+    entAddBtn.addEventListener('click', (e) => { e.stopPropagation(); showMenuFor(e.currentTarget, enterpriseMenuParts, 'enterprise-chat-input'); });
+    document.addEventListener('click', hideAddMenus);
+
+    async function uploadImageAndHandle(file, isCivilian, inputId, windowId) {
+      if (!file) return;
+      const chatWindow = document.getElementById(windowId);
+
+      const userMsg = document.createElement('div');
+      userMsg.className = 'message-user';
+      userMsg.textContent = `[attached image: ${file.name}]`;
+      chatWindow.appendChild(userMsg);
+
+      try {
+        const thumb = document.createElement('img');
+        thumb.src = URL.createObjectURL(file);
+        thumb.style.maxWidth = '160px';
+        thumb.style.display = 'block';
+        thumb.style.marginTop = '6px';
+        userMsg.appendChild(thumb);
+      } catch (_) {}
+
+      chatWindow.scrollTop = chatWindow.scrollHeight;
+
+      const endpoint = isCivilian
+        ? 'http://localhost:5001/api/chat/civilian_images'
+        : 'http://localhost:5001/api/chat/enterprise_images';
+
+      const loadingBotMsg = document.createElement('div');
+      loadingBotMsg.className = 'message-bot';
+      loadingBotMsg.textContent = 'Uploading image and asking assistant...';
+      chatWindow.appendChild(loadingBotMsg);
+      chatWindow.scrollTop = chatWindow.scrollHeight;
+
+      const fd = new FormData();
+      fd.append('image', file, file.name);
+
+      try {
+        const resp = await fetch(endpoint, { method: 'POST', body: fd });
+        if (!resp.ok) {
+          loadingBotMsg.innerHTML = renderMarkdown(`Upload error: **${resp.status}**`);
+          return;
+        }
+        const ct = resp.headers.get('content-type') || '';
+        let data = ct.includes('application/json') ? await resp.json() : await resp.text();
+
+        loadingBotMsg.textContent = '';
+
+        const botMsg = document.createElement('div');
+        botMsg.className = 'message-bot';
+
+        let reply;
+        if (typeof data === 'string') reply = data;
+        else if (data && data.reply) reply = data.reply;
+        else if (data && data.result) reply = data.result;
+        else reply = '```json\n' + JSON.stringify(data, null, 2) + '\n```';
+
+        botMsg.innerHTML = renderMarkdown(reply);
+        chatWindow.appendChild(botMsg);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+      } catch (err) {
+        loadingBotMsg.innerHTML = renderMarkdown(`Upload failed:\n\n\`\`\`\n${err?.message || err}\n\`\`\``);
+      }
+    }
+
+    document.getElementById('civilian-file-input').addEventListener('change', (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      uploadImageAndHandle(file, true, 'civilian-chat-input', 'civilian-chat-window').catch(console.error);
+      e.target.value = '';
+    });
+    document.getElementById('enterprise-file-input').addEventListener('change', (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      uploadImageAndHandle(file, false, 'enterprise-chat-input', 'enterprise-chat-window').catch(console.error);
+      e.target.value = '';
+    });
+
+    // ---------- Geolocation ----------
     let locateMeBtn = null;
     let coordsDisplay = null;
-        let userLocationMarker = null;
-        let userLocationRequested = false; // guard to avoid repeated prompts
+    let userLocationMarker = null;
+    let userLocationRequested = false;
 
-        function showCoords(lat, lng) {
-            coordsDisplay.textContent = `Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`;
-            coordsDisplay.style.display = 'block';
-            setTimeout(() => { coordsDisplay.style.display = 'none'; }, 6000);
-        }
+    function showCoords(lat, lng) {
+      coordsDisplay.textContent = `Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`;
+      coordsDisplay.style.display = 'block';
+      setTimeout(() => { coordsDisplay.style.display = 'none'; }, 6000);
+    }
 
-        function requestUserLocation(force = false) {
-            if (!navigator.geolocation) {
-                console.warn('Geolocation is not supported by this browser.');
-                return Promise.reject(new Error('Geolocation not supported'));
+    function requestUserLocation(force = false) {
+      if (!navigator.geolocation) return Promise.reject(new Error('Geolocation not supported'));
+      if (userLocationRequested && !force) return Promise.resolve(null);
+      userLocationRequested = true;
+
+      if (locateMeBtn) { locateMeBtn.disabled = true; locateMeBtn.textContent = 'Locating...'; }
+
+      return new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+
+            if (typeof google !== 'undefined' && google.maps && map) {
+              try {
+                if (userLocationMarker) userLocationMarker.setMap(null);
+                userLocationMarker = new google.maps.Marker({ position: { lat, lng }, map });
+                map.panTo({ lat, lng });
+                map.setZoom(15);
+              } catch (_) {}
             }
+            showCoords(lat, lng);
+            if (locateMeBtn) { locateMeBtn.disabled = false; locateMeBtn.textContent = 'Use my location'; }
+            resolve({ lat, lng });
+          },
+          (err) => {
+            if (locateMeBtn) { locateMeBtn.disabled = false; locateMeBtn.textContent = 'Use my location'; }
+            reject(err);
+          },
+          { enableHighAccuracy: true, timeout: 10000 }
+        );
+      });
+    }
 
-            if (userLocationRequested && !force) {
-                return Promise.resolve(null); // already asked once
-            }
+    document.addEventListener('DOMContentLoaded', () => {
+      locateMeBtn = document.getElementById('locate-me-btn');
+      coordsDisplay = document.getElementById('coords-display');
+      if (locateMeBtn) locateMeBtn.addEventListener('click', () => requestUserLocation(true).catch(() => {}));
+      requestUserLocation().catch(() => {});
+      window.addEventListener('resize', () => { if (map) google.maps.event.trigger(map, 'resize'); });
+      seedChats();
+      buildHurricaneList();
+    });
+  </script>
 
-            userLocationRequested = true;
-
-            // Optional UI feedback if button exists
-            if (locateMeBtn) {
-                locateMeBtn.disabled = true;
-                locateMeBtn.textContent = 'Locating...';
-            }
-
-            return new Promise((resolve, reject) => {
-                navigator.geolocation.getCurrentPosition(
-                    (pos) => {
-                        const lat = pos.coords.latitude;
-                        const lng = pos.coords.longitude;
-
-                        // Place or update marker only if the map is ready
-                        if (typeof google !== 'undefined' && google.maps && typeof map !== 'undefined' && map) {
-                            try {
-                                if (userLocationMarker) userLocationMarker.setMap(null);
-                                userLocationMarker = new google.maps.Marker({ position: { lat, lng }, map });
-                                map.panTo({ lat, lng });
-                                map.setZoom(15);
-                            } catch (e) {
-                                console.warn('Could not place marker (map not ready):', e);
-                            }
-                        }
-
-                        showCoords(lat, lng);
-
-                        if (locateMeBtn) {
-                            locateMeBtn.disabled = false;
-                            locateMeBtn.textContent = 'Use my location';
-                        }
-
-                        resolve({ lat, lng });
-                    },
-                    (err) => {
-                        if (locateMeBtn) {
-                            locateMeBtn.disabled = false;
-                            locateMeBtn.textContent = 'Use my location';
-                        }
-                        console.warn('Geolocation error', err);
-                        reject(err);
-                    },
-                    { enableHighAccuracy: true, timeout: 10000 }
-                );
-            });
-        }
-
-    // wiring of locate button is done after DOMContentLoaded when elements exist
-
-
-    </script>
-
-    <script>
-    // --- Hurricanes CSV parsing and UI ---
+  <!-- Hurricanes CSV UI + drawing on Google Maps -->
+  <script>
     const STORMS_CSV_PATH = './maps_spaghetti_classic/storms_near_florida.csv';
-    const SPAGHETTI_DIR = './maps_spaghetti_classic/';
+    const SPAGHETTI_DIR   = './maps_spaghetti_classic/';
 
-    // Hold drawn hurricane overlays so we can clear them
     let hurricanePolylines = [];
     let hurricaneMarkers = [];
 
-    // Simple CSV parser for the file format we have (sid,time_iso,time_ns,lat,lon)
     function parseStormsCsv(text) {
-        const lines = text.trim().split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-        if (lines.length === 0) return {};
-        const header = lines[0].split(',');
-        const rows = lines.slice(1).map(line => {
-            const cols = line.split(',');
-            return {
-                sid: cols[0].replace(/^b'|\'$/g, ''),
-                time_iso: cols[1],
-                time_ns: cols[2],
-                lat: parseFloat(cols[3]),
-                lon: parseFloat(cols[4])
-            };
-        });
-        // Group by sid
-        const groups = {};
-        rows.forEach(r => {
-            if (!groups[r.sid]) groups[r.sid] = [];
-            groups[r.sid].push(r);
-        });
-        // Sort each storm's entries by time
-        Object.keys(groups).forEach(sid => groups[sid].sort((a,b) => a.time_iso.localeCompare(b.time_iso)));
-        return groups;
+      const lines = text.trim().split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      if (!lines.length) return {};
+      const rows = lines.slice(1).map(line => {
+        const cols = line.split(',');
+        return {
+          sid: cols[0].replace(/^b'|\'$/g, ''),
+          time_iso: cols[1],
+          time_ns: cols[2],
+          lat: parseFloat(cols[3]),
+          lon: parseFloat(cols[4]),
+        };
+      });
+      const groups = {};
+      rows.forEach(r => { if (!groups[r.sid]) groups[r.sid] = []; groups[r.sid].push(r); });
+      Object.keys(groups).forEach(sid => groups[sid].sort((a,b) => a.time_iso.localeCompare(b.time_iso)));
+      return groups;
     }
 
     function clearHurricaneDrawings() {
-        hurricanePolylines.forEach(pl => pl.setMap && pl.setMap(null));
-        hurricaneMarkers.forEach(m => m.setMap && m.setMap(null));
-        hurricanePolylines = [];
-        hurricaneMarkers = [];
-        // If using Leaflet in spaghetti files, we won't reuse those; we're drawing on Google Maps here.
+      hurricanePolylines.forEach(pl => pl.setMap && pl.setMap(null));
+      hurricaneMarkers.forEach(m => m.setMap && m.setMap(null));
+      hurricanePolylines = [];
+      hurricaneMarkers = [];
     }
 
     function drawStormTimestamp(sid, timeIso) {
-        // Find matching entries for that sid/time (there may be duplicates per timestamp)
-        fetch(STORMS_CSV_PATH).then(r => r.text()).then(text => {
-            const groups = parseStormsCsv(text);
-            const entries = (groups[sid] || []).filter(e => e.time_iso === timeIso);
-            if (entries.length === 0) {
-                // If exact timestamp not found, try to find the single entry with that time by trimming ms
-                alert('No entries found for that timestamp');
-                return;
-            }
+      fetch(STORMS_CSV_PATH).then(r => r.text()).then(text => {
+        const groups = parseStormsCsv(text);
+        const entries = (groups[sid] || []).filter(e => e.time_iso === timeIso);
+        if (!entries.length) { alert('No entries found for that timestamp'); return; }
 
-            clearHurricaneDrawings();
+        clearHurricaneDrawings();
 
-            // Draw a polyline connecting all points for the storm (full track)
-            const allPoints = groups[sid].map(p => ({ lat: p.lat, lng: p.lon }));
-            const path = new google.maps.Polyline({
-                path: allPoints,
-                geodesic: true,
-                strokeColor: '#FF0000',
-                strokeOpacity: 0.8,
-                strokeWeight: 3,
-                map: map
-            });
-            hurricanePolylines.push(path);
-
-            // Place a marker for each entry in the selected timestamp (usually 1)
-            entries.forEach(ent => {
-                const marker = new google.maps.Marker({ position: { lat: ent.lat, lng: ent.lon }, map });
-                hurricaneMarkers.push(marker);
-
-                // Try to find an image for this storm (a spaghetti HTML exists per sid). We'll embed the spaghetti HTML via iframe if present.
-                const iframeSrc = SPAGHETTI_DIR + "b'" + sid + "'_spaghetti.html";
-                const infoContent = document.createElement('div');
-                infoContent.style.maxWidth = '320px';
-                const title = document.createElement('div');
-                title.textContent = `${sid} @ ${ent.time_iso}`;
-                title.style.fontWeight = '600';
-                title.style.marginBottom = '6px';
-                infoContent.appendChild(title);
-
-                // Add a small lat/lon line
-                const coordLine = document.createElement('div');
-                coordLine.textContent = `Lat: ${ent.lat.toFixed(4)}, Lng: ${ent.lon.toFixed(4)}`;
-                coordLine.style.fontSize = '12px';
-                coordLine.style.marginBottom = '6px';
-                infoContent.appendChild(coordLine);
-
-                // If the spaghetti HTML exists, embed it in an iframe (same-origin) else show a placeholder
-                fetch(iframeSrc, { method: 'HEAD' }).then(() => {
-                    const iframe = document.createElement('iframe');
-                    iframe.src = iframeSrc;
-                    iframe.width = '300';
-                    iframe.height = '200';
-                    iframe.style.border = '1px solid #ddd';
-                    infoContent.appendChild(iframe);
-                    const infowindow = new google.maps.InfoWindow({ content: infoContent });
-                    marker.addListener('click', () => infowindow.open(map, marker));
-                    // open immediately
-                    infowindow.open(map, marker);
-                }).catch(() => {
-                    // HEAD failed — show a simple placeholder image if you have any images in the folder
-                    const img = document.createElement('img');
-                    img.src = SPAGHETTI_DIR + 'spaghetti_combined.html'; // fallback: user can edit to a png if available
-                    img.alt = sid;
-                    img.style.width = '100%';
-                    img.style.height = 'auto';
-                    infoContent.appendChild(img);
-                    const infowindow = new google.maps.InfoWindow({ content: infoContent });
-                    marker.addListener('click', () => infowindow.open(map, marker));
-                    infowindow.open(map, marker);
-                });
-            });
-
-            // Pan map to the selected point
-            const first = entries[0];
-            if (first && map) {
-                map.panTo({ lat: first.lat, lng: first.lon });
-                map.setZoom(6);
-            }
+        const allPoints = groups[sid].map(p => ({ lat: p.lat, lng: p.lon }));
+        const path = new google.maps.Polyline({
+          path: allPoints,
+          geodesic: true,
+          strokeColor: '#FF0000',
+          strokeOpacity: 0.8,
+          strokeWeight: 3,
+          map: map
         });
+        hurricanePolylines.push(path);
+
+        entries.forEach(ent => {
+          const marker = new google.maps.Marker({ position: { lat: ent.lat, lng: ent.lon }, map });
+          hurricaneMarkers.push(marker);
+
+          const iframeSrc = SPAGHETTI_DIR + "b'" + sid + "'_spaghetti.html";
+          const infoContent = document.createElement('div');
+          infoContent.style.maxWidth = '320px';
+
+          const title = document.createElement('div');
+          title.textContent = `${sid} @ ${ent.time_iso}`;
+          title.style.fontWeight = '600';
+          title.style.marginBottom = '6px';
+          infoContent.appendChild(title);
+
+          const coordLine = document.createElement('div');
+          coordLine.textContent = `Lat: ${ent.lat.toFixed(4)}, Lng: ${ent.lon.toFixed(4)}`;
+          coordLine.style.fontSize = '12px';
+          coordLine.style.marginBottom = '6px';
+          infoContent.appendChild(coordLine);
+
+          fetch(iframeSrc, { method: 'HEAD' }).then(() => {
+            const iframe = document.createElement('iframe');
+            iframe.src = iframeSrc;
+            iframe.width = '300';
+            iframe.height = '200';
+            iframe.style.border = '1px solid #ddd';
+            infoContent.appendChild(iframe);
+            const infowindow = new google.maps.InfoWindow({ content: infoContent });
+            marker.addListener('click', () => infowindow.open(map, marker));
+            infowindow.open(map, marker);
+          }).catch(() => {
+            const img = document.createElement('img');
+            img.src = SPAGHETTI_DIR + 'spaghetti_combined.html'; // adjust to an image if available
+            img.alt = sid;
+            img.style.width = '100%';
+            img.style.height = 'auto';
+            infoContent.appendChild(img);
+            const infowindow = new google.maps.InfoWindow({ content: infoContent });
+            marker.addListener('click', () => infowindow.open(map, marker));
+            infowindow.open(map, marker);
+          });
+        });
+
+        const first = entries[0];
+        if (first && map) {
+          map.panTo({ lat: first.lat, lng: first.lon });
+          map.setZoom(6);
+        }
+      });
     }
 
     function buildHurricaneList() {
-        const container = document.getElementById('hurricane-list');
-        fetch(STORMS_CSV_PATH).then(r => r.text()).then(text => {
-            const groups = parseStormsCsv(text);
-            container.innerHTML = '';
-            Object.keys(groups).sort().forEach(sid => {
-                const stormDiv = document.createElement('div');
-                stormDiv.className = 'storm-item';
+      const container = document.getElementById('hurricane-list');
+      fetch(STORMS_CSV_PATH).then(r => r.text()).then(text => {
+        const groups = parseStormsCsv(text);
+        container.innerHTML = '';
+        Object.keys(groups).sort().forEach(sid => {
+          const stormDiv = document.createElement('div');
+          stormDiv.className = 'storm-item';
 
-                const header = document.createElement('div');
-                header.className = 'storm-header';
-                header.textContent = sid + `  (${groups[sid].length} points)`;
-                stormDiv.appendChild(header);
+          const header = document.createElement('div');
+          header.className = 'storm-header';
+          header.textContent = sid + `  (${groups[sid].length} points)`;
+          stormDiv.appendChild(header);
 
-                const tsList = document.createElement('div');
-                tsList.className = 'storm-timestamps';
-                groups[sid].forEach(entry => {
-                    const ts = document.createElement('div');
-                    ts.className = 'timestamp-item';
-                    ts.textContent = entry.time_iso;
-                    ts.addEventListener('click', () => {
-                        // switch to home tab and draw
-                        openTab('home');
-                        drawStormTimestamp(sid, entry.time_iso);
-                    });
-                    tsList.appendChild(ts);
-                });
+          const tsList = document.createElement('div');
+          tsList.className = 'storm-timestamps';
+          groups[sid].forEach(entry => {
+            const ts = document.createElement('div');
+            ts.className = 'timestamp-item';
+            ts.textContent = entry.time_iso;
+            ts.addEventListener('click', () => { openTab('home'); drawStormTimestamp(sid, entry.time_iso); });
+            tsList.appendChild(ts);
+          });
 
-                header.addEventListener('click', () => tsList.classList.toggle('active'));
-
-                stormDiv.appendChild(tsList);
-                container.appendChild(stormDiv);
-            });
-        }).catch(err => {
-            container.innerHTML = '<p>Could not load storms CSV.</p>';
-            console.error(err);
+          header.addEventListener('click', () => tsList.classList.toggle('active'));
+          stormDiv.appendChild(tsList);
+          container.appendChild(stormDiv);
         });
+      }).catch(err => {
+        container.innerHTML = '<p>Could not load storms CSV.</p>';
+        console.error(err);
+      });
     }
+  </script>
 
-    // Build hurricane list when user opens Hurricanes tab (or on load)
-    document.addEventListener('DOMContentLoaded', () => {
-        // Build immediately so it's ready in the tab
-        buildHurricaneList();
-    });
-    </script>
-
-    <script
-        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBQQhjLjjYo4CCV3yil5JBCxpoBOz7qExY&callback=initMap"
-        defer
-    ></script>
-
+  <!-- Google Maps API (leave your key as-is) -->
+  <script
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBQQhjLjjYo4CCV3yil5JBCxpoBOz7qExY&callback=initMap"
+    defer
+  ></script>
 </body>
 </html>
