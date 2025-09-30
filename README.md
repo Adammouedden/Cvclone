@@ -3,7 +3,7 @@ Cvclone is a prototype web app for hurricane/disaster preparedness that combines
 
 ## src: all source code for Cvclone
 ### front_end:
-    * Mobile app powered by Android SDK
+    * Web app built with JavaScript & HTML
 
 ### back_end:
     * Agents:
